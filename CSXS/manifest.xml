@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<ExtensionManifest Version="11.0" ExtensionBundleId="com.kaycee.panel" ExtensionBundleVersion="4.0" ExtensionBundleName="Kaycee">
+  <ExtensionList>
+    <Extension Id="com.kaycee.panel" Version="4.0" />
+  </ExtensionList>
+  <ExecutionEnvironment>
+    <HostList>
+      <Host Name="AEFT" Version="[16.0,99.9]" />
+    </HostList>
+    <LocaleList>
+      <Locale Code="All" />
+    </LocaleList>
+    <RequiredRuntimeList>
+      <RequiredRuntime Name="CSXS" Version="11.0" />
+    </RequiredRuntimeList>
+  </ExecutionEnvironment>
+  <DispatchInfoList>
+    <Extension Id="com.kaycee.panel">
+      <DispatchInfo>
+        <Resources>
+          <MainPath>./index.html</MainPath>
+          <ScriptPath>./jsx/main.jsx</ScriptPath>
+          <CEFCommandLine>
+            <Parameter>--allow-file-access-from-files</Parameter>
+            <Parameter>--enable-nodejs</Parameter>
+          </CEFCommandLine>
+        </Resources>
+        <Lifecycle>
+          <AutoVisible>true</AutoVisible>
+        </Lifecycle>
+        <UI>
+          <Type>Panel</Type>
+          <Menu>Kaycee</Menu>
+          <Geometry>
+            <Size>
+              <Height>520</Height>
+              <Width>280</Width>
+            </Size>
+            <MinSize>
+              <Height>400</Height>
+              <Width>240</Width>
+            </MinSize>
+          </Geometry>
+          <Icons>
+          </Icons>
+        </UI>
+      </DispatchInfo>
+    </Extension>
+  </DispatchInfoList>
+</ExtensionManifest>

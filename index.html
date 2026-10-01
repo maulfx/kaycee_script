@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Kaycee</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+  <!-- Background Layer -->
+  <div id="bg-layer"></div>
+  <div id="bg-overlay"></div>
+
+  <!-- Main Panel -->
+  <div id="main-panel">
+
+    <!-- Header — centered title -->
+    <div id="header">
+      <span class="title">Kaycee</span>
+    </div>
+
+    <hr class="divider" />
+
+    <!-- COMPOSITION -->
+    <div id="section-comp" class="section-wrap">
+      <div class="section-label">Composition</div>
+      <div class="row stretch">
+        <button id="btn-precomp" title="Pre-Comp each selected layer individually | Shift: all into one">Pre-Comp</button>
+        <button id="btn-mt"      title="Twixtor Pro | Shift: Motion Tile">M / T</button>
+      </div>
+      <div class="row stretch">
+        <button id="btn-trim-remap" title="Trim selected layer's out-point to its last Time Remap keyframe">Trim Remap</button>
+      </div>
+    </div>
+
+    <hr class="divider" />
+
+    <!-- COMP SIZE -->
+    <div id="section-comp-size" class="section-wrap">
+      <div class="comp-size-header-bar">
+        <div class="section-label">Comp Size</div>
+        <button id="btn-toggle-add-preset" class="comp-tool-btn" title="Add / Configure presets">
+          <span id="toggle-preset-icon">+</span>
+          <span id="toggle-preset-text">Preset</span>
+        </button>
+      </div>
+
+      <!-- Quick Preset Buttons Grid (One-click resize in AE) -->
+      <div id="comp-preset-buttons" class="comp-preset-grid">
+        <!-- Dynamically rendered: 16:9, 9:16, 1:1, 4:5, etc. -->
+      </div>
+
+      <!-- Inline Add Preset Drawer -->
+      <div id="inline-add-preset-box" class="inline-add-preset-box collapsed">
+        <div class="inline-add-title-row">
+          <span class="inline-add-title">Add Size Preset</span>
+          <button id="btn-get-current-comp" class="inline-action-btn" title="Read current active comp dimensions from AE">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+              <circle cx="12" cy="12" r="10"/>
+              <circle cx="12" cy="12" r="3"/>
+            </svg>
+            <span>Get Active</span>
+          </button>
+        </div>
+
+        <div class="inline-form-row">
+          <input type="text" id="inline-preset-name" placeholder="Name (e.g. 4K, Reels, 21:9)" maxlength="16" />
+        </div>
+
+        <div class="inline-form-row-dims">
+          <div class="dim-input-wrap">
+            <span class="dim-tag">W</span>
+            <input type="number" id="inline-preset-width" placeholder="1920" min="1" max="16384" />
+          </div>
+          <span class="dim-multiply">×</span>
+          <div class="dim-input-wrap">
+            <span class="dim-tag">H</span>
+            <input type="number" id="inline-preset-height" placeholder="1080" min="1" max="16384" />
+          </div>
+          <button id="btn-inline-add-preset" class="btn-inline-submit" title="Add preset button">+ Add</button>
+        </div>
+
+        <div class="inline-footer-row">
+          <span class="inline-tip">Tip: Right-click button to delete</span>
+          <button id="btn-restore-comp-defaults" class="inline-link-btn" title="Restore default presets">Defaults</button>
+        </div>
+      </div>
+    </div>
+
+    <hr class="divider" />
+
+    <!-- COMP FPS -->
+    <div id="section-comp-fps" class="section-wrap">
+      <div class="comp-size-header-bar">
+        <div class="section-label">Comp FPS</div>
+        <button id="btn-toggle-add-fps" class="comp-tool-btn" title="Add / Configure FPS presets">
+          <span id="toggle-fps-icon">+</span>
+          <span id="toggle-fps-text">FPS</span>
+        </button>
+      </div>
+
+      <!-- Quick Preset Buttons Grid (One-click frame rate in AE) -->
+      <div id="comp-fps-buttons" class="comp-fps-grid">
+        <!-- Dynamically rendered: 24, 25, 30, 60, etc. -->
+      </div>
+
+      <!-- Inline Add FPS Drawer -->
+      <div id="inline-add-fps-box" class="inline-add-preset-box collapsed">
+        <div class="inline-add-title-row">
+          <span class="inline-add-title">Add FPS Preset</span>
+          <button id="btn-get-current-fps" class="inline-action-btn" title="Read current active comp FPS from AE">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+              <circle cx="12" cy="12" r="10"/>
+              <circle cx="12" cy="12" r="3"/>
+            </svg>
+            <span>Get Active</span>
+          </button>
+        </div>
+
+        <div class="inline-form-row">
+          <input type="text" id="inline-fps-name" placeholder="Label (optional, e.g. Film, PAL)" maxlength="16" />
+        </div>
+
+        <div class="inline-form-row-dims">
+          <div class="dim-input-wrap">
+            <span class="dim-tag">FPS</span>
+            <input type="number" id="inline-fps-value" placeholder="24" step="any" min="1" max="999" />
+          </div>
+          <button id="btn-inline-add-fps" class="btn-inline-submit" title="Add FPS button">+ Add</button>
+        </div>
+
+        <div class="inline-footer-row">
+          <span class="inline-tip">Tip: Right-click button to delete</span>
+          <button id="btn-restore-fps-defaults" class="inline-link-btn" title="Restore default FPS presets">Defaults</button>
+        </div>
+      </div>
+    </div>
+
+    <hr class="divider" />
+
+    <!-- LAYERS -->
+    <div id="section-layers" class="section-wrap">
+      <div class="section-label">Layers</div>
+      <div class="layers-inner">
+        <div class="col-actions">
+          <button id="btn-null"    title="Add Null + parent selected | Shift: Adjustment Layer">NULL / ADJ</button>
+          <button id="btn-sld"     title="Add Solid | Shift: Add Camera">SLD / CMRA</button>
+          <button id="btn-opacity" title="Apply opacity to selected layers">Opacity</button>
+          <button id="btn-fit"     title="Fill comp horizontally (keep ratio) | Shift: Fill vertically">Fit to Comp</button>
+        </div>
+        <div class="dpad">
+          <button id="dpad-tl">↖</button>
+          <button id="dpad-tm">↑</button>
+          <button id="dpad-tr">↗</button>
+          <button id="dpad-ml">←</button>
+          <button id="dpad-mc" class="center">◎</button>
+          <button id="dpad-mr">→</button>
+          <button id="dpad-bl">↙</button>
+          <button id="dpad-bm">↓</button>
+          <button id="dpad-br">↘</button>
+        </div>
+      </div>
+    </div>
+
+    <hr class="divider" />
+
+    <!-- OPACITY -->
+    <div id="section-opacity" class="section-wrap">
+      <label for="opacity-input">Opacity %</label>
+      <input id="opacity-input" type="number" value="100" min="0" max="100" />
+    </div>
+
+    <hr class="divider" />
+
+    <!-- FOOTER -->
+    <div id="footer">
+      <button id="btn-trash"  class="icon-btn danger" title="Delete selected layers">🗑</button>
+      <button id="btn-shield" class="icon-btn"        title="Toggle lock">🛡</button>
+      <button id="btn-gear"   class="icon-btn"        title="Settings">⚙</button>
+      <span class="spacer"></span>
+    </div>
+
+  </div>
+
+  <!-- SETTINGS PANEL -->
+  <div id="settings-panel">
+
+    <!-- Header with icon & close -->
+    <div class="settings-header">
+      <div class="settings-header-left">
+        <div class="settings-header-icon">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+          </svg>
+        </div>
+        <div class="settings-title-group">
+          <span class="settings-title">Preferences</span>
+          <span class="settings-subtitle">Appearance & Effects</span>
+        </div>
+      </div>
+      <button class="settings-close" id="btn-settings-close" title="Close Settings">✕</button>
+    </div>
+
+    <!-- Scrollable content area -->
+    <div class="settings-body">
+
+      <!-- CARD 1: Background Media -->
+      <div class="settings-card">
+        <div class="settings-card-header">
+          <svg class="settings-card-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+            <circle cx="8.5" cy="8.5" r="1.5"/>
+            <polyline points="21 15 16 10 5 21"/>
+          </svg>
+          <span class="settings-card-title">Background Media</span>
+        </div>
+
+        <div class="bg-file-box">
+          <div class="bg-file-info">
+            <span class="bg-file-icon" id="bg-file-icon">🖼️</span>
+            <span id="bg-file-name" title="No file selected">Default Dark</span>
+          </div>
+          <div class="bg-file-actions">
+            <button id="btn-pick-file" class="btn-subtle" title="Choose image or video file">
+              <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="17 8 12 3 7 8"></polyline>
+                <line x1="12" y1="3" x2="12" y2="15"></line>
+              </svg>
+              <span>Choose</span>
+            </button>
+            <button id="btn-clear-bg" class="btn-subtle danger-subtle" title="Remove background">Clear</button>
+          </div>
+        </div>
+        <input type="file" id="bg-file-input" accept="image/*,video/*" />
+        <span class="settings-help">Supports PNG, JPG, GIF, WebM, MP4</span>
+      </div>
+
+      <!-- CARD 2: Glass & Blur Effects -->
+      <div class="settings-card">
+        <div class="settings-card-header">
+          <svg class="settings-card-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+          </svg>
+          <span class="settings-card-title">Glass & Blur Effects</span>
+        </div>
+
+        <!-- Overlay Blur -->
+        <div class="settings-control">
+          <div class="settings-control-label">
+            <span>Overlay Blur</span>
+            <span class="slider-val" id="val-blur">12px</span>
+          </div>
+          <div class="slider-track-wrap">
+            <input type="range" id="slider-blur" min="0" max="20" step="1" value="12" />
+          </div>
+        </div>
+
+        <!-- Overlay Opacity -->
+        <div class="settings-control">
+          <div class="settings-control-label">
+            <span>Overlay Dimming</span>
+            <span class="slider-val" id="val-overlay">55%</span>
+          </div>
+          <div class="slider-track-wrap">
+            <input type="range" id="slider-overlay" min="0" max="100" step="1" value="55" />
+          </div>
+        </div>
+
+        <!-- Button Blur -->
+        <div class="settings-control">
+          <div class="settings-control-label">
+            <span>Button Frost Blur</span>
+            <span class="slider-val" id="val-btn-blur">8px</span>
+          </div>
+          <div class="slider-track-wrap">
+            <input type="range" id="slider-btn-blur" min="0" max="30" step="1" value="8" />
+          </div>
+        </div>
+      </div>
+
+      <!-- CARD 3: Theme Accent Color -->
+      <div class="settings-card">
+        <div class="settings-card-header">
+          <svg class="settings-card-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"/>
+            <path d="m4.93 4.93 4.24 4.24"/>
+            <path d="m14.83 9.17 4.24-4.24"/>
+            <path d="m14.83 14.83 4.24 4.24"/>
+            <path d="m9.17 14.83-4.24 4.24"/>
+          </svg>
+          <span class="settings-card-title">Theme Accent Color</span>
+        </div>
+
+        <div class="color-row-custom">
+          <div class="color-picker-wrapper">
+            <input type="color" id="font-color-input" value="#7b8fff" />
+            <div class="color-picker-preview" id="color-preview-disc"></div>
+          </div>
+          <span id="font-color-hex" class="hex-badge">#7b8fff</span>
+          <button id="btn-font-color-reset" class="reset-btn" title="Reset to default color">Reset</button>
+        </div>
+
+        <!-- Quick Presets -->
+        <div class="preset-label">Quick Themes</div>
+        <div class="preset-palette">
+          <button class="preset-chip active" data-color="#7b8fff" style="--chip-c: #7b8fff;" title="Lavender (Default)"></button>
+          <button class="preset-chip" data-color="#00f0ff" style="--chip-c: #00f0ff;" title="Cyber Cyan"></button>
+          <button class="preset-chip" data-color="#ff3b81" style="--chip-c: #ff3b81;" title="Hot Pink"></button>
+          <button class="preset-chip" data-color="#a855f7" style="--chip-c: #a855f7;" title="Purple Neon"></button>
+          <button class="preset-chip" data-color="#10b981" style="--chip-c: #10b981;" title="Emerald"></button>
+          <button class="preset-chip" data-color="#f59e0b" style="--chip-c: #f59e0b;" title="Amber Sunset"></button>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Pinned Footer Buttons -->
+    <div class="settings-footer">
+      <button id="btn-settings-reset-all" class="btn-subtle" title="Reset all settings to default">Reset All</button>
+      <button id="btn-settings-apply" class="btn-primary-apply">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+          <polyline points="20 6 9 17 4 12"/>
+        </svg>
+        <span>Save & Apply</span>
+      </button>
+    </div>
+
+  </div>
+
+  <script src="js/CSInterface.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
