@@ -101,13 +101,21 @@ if (-not (Test-Path $binFFmpeg)) {
 }
 
 # ----------------------------------------------------
-# STEP 4: Pre-download Default Fast Model & Verify
+# STEP 4: Pre-download Default Fast Models & Verify
 # ----------------------------------------------------
-Write-Host "`n[4/4] Pre-downloading default AI model (UVR-MDX-NET-Voc_FT)..."
+Write-Host "`n[4/4] Pre-downloading default AI models..."
 try {
+    Write-Host "Pre-downloading Audio AI model (UVR-MDX-NET-Voc_FT)..."
     & $pythonExe -m audio_separator.utils.cli --download_model_only -m UVR-MDX-NET-Voc_FT.onnx
 } catch {
-    Write-Host "Model pre-download warning: will download on first run."
+    Write-Host "Audio model pre-download warning: will download on first run."
+}
+
+try {
+    Write-Host "Pre-downloading Bg Remover model (IS-Net Detail)..."
+    & $pythonExe -c "import rembg; rembg.new_session('isnet-general-use')"
+} catch {
+    Write-Host "Bg Remover model pre-download warning: will download on first run."
 }
 
 Write-Host "`nVerifying engine..."
