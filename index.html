@@ -42,6 +42,16 @@
         </svg>
         <span>Audio AI</span>
       </button>
+      <button id="nav-btn-bg" class="nav-btn" data-tab="tab-bg" title="AI Image Background Remover (Cutout)">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="6" cy="6" r="3"></circle>
+          <circle cx="6" cy="18" r="3"></circle>
+          <line x1="20" y1="4" x2="8.12" y2="15.88"></line>
+          <line x1="14.47" y1="14.48" x2="20" y2="20"></line>
+          <line x1="8.12" y1="8.12" x2="12" y2="12"></line>
+        </svg>
+        <span>Bg Remover</span>
+      </button>
     </div>
 
     <hr class="divider" />
@@ -271,6 +281,69 @@
 
     </div> <!-- /#tab-audio -->
 
+    <!-- TAB 3: AI IMAGE BACKGROUND REMOVER -->
+    <div id="tab-bg" class="tab-content">
+
+      <!-- AI Model Selection -->
+      <div class="section-wrap">
+        <div class="section-label">AI Model</div>
+        <div class="model-select-grid">
+          <!-- Detail Quality (IS-Net DIS) -->
+          <div class="model-card active" id="bg-model-card-isnet" data-model="isnet" title="Spesialis rambut halus, bulu, kaca transparan & detail tipis (IS-Net DIS)">
+            <div class="model-title">✂️ Detail Quality</div>
+          </div>
+
+          <!-- Ultra Quality (BiRefNet Flagship) -->
+          <div class="model-card" id="bg-model-card-birefnet" data-model="birefnet" title="Model SOTA Flagship terbaik untuk objek, produk & studio compositing (BiRefNet 1024px)">
+            <div class="model-title">👑 Ultra Quality</div>
+          </div>
+        </div>
+      </div>
+
+
+
+      <hr class="divider" />
+
+      <!-- Output Options -->
+      <div class="section-wrap">
+        <div class="section-label">Output Options</div>
+        <div class="audio-options-list">
+          <label class="audio-checkbox-label">
+            <input type="checkbox" id="chk-bg-hide-original" checked />
+            <span>Hide original layer in AE timeline</span>
+          </label>
+        </div>
+      </div>
+
+      <hr class="divider" />
+
+      <!-- Execution & Progress -->
+      <div class="section-wrap">
+        <button id="btn-bg-remove" class="btn-audio-primary" title="Remove Background and Import Cutout to Timeline">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="6" cy="6" r="3"></circle>
+            <circle cx="6" cy="18" r="3"></circle>
+            <line x1="20" y1="4" x2="8.12" y2="15.88"></line>
+            <line x1="14.47" y1="14.48" x2="20" y2="20"></line>
+            <line x1="8.12" y1="8.12" x2="12" y2="12"></line>
+          </svg>
+          <span id="btn-bg-remove-text">Remove Background & Import</span>
+        </button>
+
+        <!-- Progress Box -->
+        <div id="bg-status-box" class="audio-status-box collapsed">
+          <div class="audio-status-header">
+            <span id="bg-status-text">Ready</span>
+            <span id="bg-status-percent">0%</span>
+          </div>
+          <div class="audio-progress-bar-wrap">
+            <div id="bg-progress-bar" class="audio-progress-bar" style="width: 0%;"></div>
+          </div>
+        </div>
+      </div>
+
+    </div> <!-- /#tab-bg -->
+
     <hr class="divider" />
 
     <!-- FOOTER -->
@@ -415,6 +488,44 @@
         </div>
       </div>
 
+      <!-- CARD 4: AI Temp Cache & Storage -->
+      <div class="settings-card">
+        <div class="settings-card-header">
+          <svg class="settings-card-icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="3 6 5 6 21 6"></polyline>
+            <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+          </svg>
+          <span class="settings-card-title">AI Temp Cache & Storage</span>
+        </div>
+
+        <div class="settings-control">
+          <div class="cache-stat-row">
+            <span class="cache-stat-label">🖼️ Cutouts Cache:</span>
+            <span id="cache-size-cutouts" class="cache-stat-val">Calculating...</span>
+          </div>
+          <div class="cache-stat-row">
+            <span class="cache-stat-label">🎵 Audio Stems Cache:</span>
+            <span id="cache-size-stems" class="cache-stat-val">Calculating...</span>
+          </div>
+        </div>
+
+        <div class="cache-actions-row">
+          <button id="btn-clear-temp-cache" class="btn-subtle danger-text" title="Delete all temporary stem files and cutout PNGs">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+              <polyline points="3 6 5 6 21 6"></polyline>
+              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+            </svg>
+            <span>Clear Temp Cache</span>
+          </button>
+          <button id="btn-open-temp-folder" class="btn-subtle" title="Open temporary folder in File Explorer">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+              <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path>
+            </svg>
+            <span>Open Folder</span>
+          </button>
+        </div>
+      </div>
+
     </div>
 
     <!-- Pinned Footer Buttons -->
@@ -432,6 +543,7 @@
 
   <script src="js/CSInterface.js"></script>
   <script src="js/audioSeparator.js"></script>
+  <script src="js/bgRemover.js"></script>
   <script src="js/main.js"></script>
 </body>
 </html>

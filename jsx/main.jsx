@@ -781,6 +781,135 @@ function kaycee_importAndAddStems(vocalsPath, instPath, targetLayerIndex, muteOr
     }
 }
 
+// ── AI Image Background Removal (Cutout) ──────────────────────
 
+// Detect currently selected image layer in After Effects
+function kaycee_getSelectedImageLayer() {
+    try {
+        var comp = kaycee_getComp();
+        if (!comp) return _err("No active composition in After Effects.");
 
+        var layers = comp.selectedLayers;
+        if (!layers || layers.length === 0) {
+            return _err("Please select an image layer in the timeline.");
+        }
 
+        var lyr = layers[0];
+        if (!lyr.source || !(lyr.source instanceof FootageItem)) {
+            return _err("Selected layer '" + lyr.name + "' is not an image footage layer (PNG, JPG, PSD, WebP, etc.).");
+        }
+
+        var file = lyr.source.file;
+        if (!file || !file.exists) {
+            return _err("Footage file not found on disk for layer: " + lyr.name);
+        }
+
+        var filePath = file.fsName;
+        var fLower = filePath.toLowerCase();
+        var isImage = (
+            fLower.indexOf('.png') !== -1 ||
+            fLower.indexOf('.jpg') !== -1 ||
+            fLower.indexOf('.jpeg') !== -1 ||
+            fLower.indexOf('.webp') !== -1 ||
+            fLower.indexOf('.psd') !== -1 ||
+            fLower.indexOf('.tif') !== -1 ||
+            fLower.indexOf('.tiff') !== -1 ||
+            fLower.indexOf('.bmp') !== -1
+        );
+
+        if (!isImage) {
+            return _err("Selected layer '" + lyr.name + "' is not a supported image file (PNG, JPG, PSD, WebP, etc.).");
+        }
+
+        return JSON.stringify({
+            ok: true,
+            name: lyr.name,
+            index: lyr.index,
+            filePath: filePath,
+            width: lyr.source.width,
+            height: lyr.source.height
+        });
+    } catch (e) {
+        return _err("Error detecting image layer: " + e.toString());
+    }
+}
+
+// Import cutout PNG into project and position exactly over target layer
+function kaycee_importAndAddCutout(pngPath, targetLayerIndex, hideOriginal, qualityLabel) {
+    try {
+        var comp = kaycee_getComp();
+        if (!comp) return _err("No active composition in After Effects.");
+
+        var targetLayer = null;
+        if (targetLayerIndex && targetLayerIndex <= comp.numLayers) {
+            targetLayer = comp.layer(targetLayerIndex);
+        }
+
+        var pngFile = new File(pngPath);
+        if (!pngFile.exists) {
+            return _err("Cutout image not found on disk: " + pngPath);
+        }
+
+        app.beginUndoGroup("Kaycee AI Background Removal");
+
+        var qLabel = (qualityLabel && qualityLabel !== "") ? qualityLabel : "Cutout";
+        var itemName = (targetLayer ? targetLayer.name : "Image") + " (" + qLabel + ")";
+
+        var io = new ImportOptions(pngFile);
+        var item = app.project.importFile(io);
+        try { item.name = itemName; } catch(e) {}
+
+        var newLayer = comp.layers.add(item);
+        try { newLayer.name = itemName; } catch(e) {}
+
+        if (targetLayer) {
+            // Match timing
+            newLayer.startTime = targetLayer.startTime;
+            newLayer.inPoint = targetLayer.inPoint;
+            newLayer.outPoint = targetLayer.outPoint;
+
+            // Copy 2D / 3D transform properties
+            try {
+                if (targetLayer.threeDLayer) {
+                    newLayer.threeDLayer = true;
+                }
+            } catch(e) {}
+
+            try {
+                if (targetLayer.transform.position.dimensionsSeparated) {
+                    newLayer.transform.position.dimensionsSeparated = true;
+                    newLayer.transform.xPosition.setValue(targetLayer.transform.xPosition.value);
+                    newLayer.transform.yPosition.setValue(targetLayer.transform.yPosition.value);
+                    if (targetLayer.threeDLayer) {
+                        newLayer.transform.zPosition.setValue(targetLayer.transform.zPosition.value);
+                    }
+                } else {
+                    newLayer.transform.position.setValue(targetLayer.transform.position.value);
+                }
+            } catch(e) {}
+
+            try { newLayer.transform.scale.setValue(targetLayer.transform.scale.value); } catch(e) {}
+            try { newLayer.transform.rotation.setValue(targetLayer.transform.rotation.value); } catch(e) {}
+            try { newLayer.transform.opacity.setValue(targetLayer.transform.opacity.value); } catch(e) {}
+            try { newLayer.transform.anchorPoint.setValue(targetLayer.transform.anchorPoint.value); } catch(e) {}
+
+            // Place directly above original layer
+            try {
+                newLayer.moveBefore(targetLayer);
+            } catch(e) {}
+
+            // Hide original layer if requested
+            if (hideOriginal) {
+                try {
+                    targetLayer.enabled = false;
+                } catch(e) {}
+            }
+        }
+
+        app.endUndoGroup();
+        return JSON.stringify({ ok: true, name: newLayer.name, index: newLayer.index });
+    } catch (e) {
+        try { app.endUndoGroup(); } catch(ex) {}
+        return _err("Failed to import cutout into AE: " + e.toString());
+    }
+}

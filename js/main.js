@@ -4,6 +4,13 @@
 
 'use strict';
 
+// Detect Node.js environment in CEP
+var nodeRequire = (typeof window.require === 'function') ? window.require : null;
+var child_process = nodeRequire ? nodeRequire('child_process') : null;
+var fs = nodeRequire ? nodeRequire('fs') : null;
+var path = nodeRequire ? nodeRequire('path') : null;
+var os = nodeRequire ? nodeRequire('os') : null;
+
 // ── CSInterface ──────────────────────────────────────────────
 var csInterface = new CSInterface();
 
@@ -136,6 +143,7 @@ var bgOverlay     = document.getElementById('bg-overlay');
 
 function openSettings() {
   settingsPanel.classList.add('open');
+  updateCacheStats();
 }
 
 function closeSettings() {
@@ -155,6 +163,10 @@ document.addEventListener('keydown', function (e) {
 onBtn('btn-pick-file', function () {
   document.getElementById('bg-file-input').click();
 });
+
+// Cache buttons
+onBtn('btn-clear-temp-cache', clearTempCache);
+onBtn('btn-open-temp-folder', openTempFolder);
 
 var pendingFileDataURL = null;
 var pendingFileType    = null; // 'image' | 'video'
@@ -1041,14 +1053,180 @@ function initNavTabs() {
       if (targetTabId === 'tab-audio' && window.KayceeAudioSeparator) {
         window.KayceeAudioSeparator.detect();
       }
+
+      // If switching to Bg Remover, auto-detect layer
+      if (targetTabId === 'tab-bg' && window.KayceeBgRemover) {
+        window.KayceeBgRemover.detect();
+      }
     });
   });
+}
+
+// ── AI Cache & Temporary Storage Management ─────────────────
+
+function getDirectorySize(dirPath) {
+  var total = 0;
+  if (!fs || !fs.existsSync(dirPath)) return 0;
+  try {
+    var entries = fs.readdirSync(dirPath, { withFileTypes: true });
+    for (var i = 0; i < entries.length; i++) {
+      var full = path.join(dirPath, entries[i].name);
+      if (entries[i].isDirectory()) {
+        total += getDirectorySize(full);
+      } else {
+        try { total += fs.statSync(full).size; } catch (e) {}
+      }
+    }
+  } catch (e) {}
+  return total;
+}
+
+function formatBytesReadable(bytes) {
+  if (bytes <= 0) return '0 KB';
+  if (bytes >= 1048576) return (bytes / 1048576).toFixed(1) + ' MB';
+  if (bytes >= 1024) return (bytes / 1024).toFixed(0) + ' KB';
+  return bytes + ' B';
+}
+
+function updateCacheStats() {
+  if (!os || !fs || !path) return;
+  var tmp = os.tmpdir();
+
+  // 1. Cutouts cache size
+  var cutoutsDir = path.join(tmp, 'kaycee_cutouts');
+  var cutoutsSize = getDirectorySize(cutoutsDir);
+  var elCutouts = document.getElementById('cache-size-cutouts');
+  if (elCutouts) elCutouts.textContent = formatBytesReadable(cutoutsSize);
+
+  // 2. Audio stems cache size
+  var stemsSize = 0;
+  try {
+    var items = fs.readdirSync(tmp);
+    for (var i = 0; i < items.length; i++) {
+      if (items[i].indexOf('kaycee_stems_') === 0) {
+        stemsSize += getDirectorySize(path.join(tmp, items[i]));
+      }
+    }
+  } catch (e) {}
+  var elStems = document.getElementById('cache-size-stems');
+  if (elStems) elStems.textContent = formatBytesReadable(stemsSize);
+}
+
+function deleteFolderRecursive(folderPath) {
+  if (fs && fs.existsSync(folderPath)) {
+    fs.readdirSync(folderPath).forEach(function (file) {
+      var curPath = path.join(folderPath, file);
+      if (fs.lstatSync(curPath).isDirectory()) {
+        deleteFolderRecursive(curPath);
+      } else {
+        fs.unlinkSync(curPath);
+      }
+    });
+    fs.rmdirSync(folderPath);
+  }
+}
+
+function clearTempCache() {
+  if (!os || !fs || !path) return;
+  var tmp = os.tmpdir();
+  var count = 0;
+
+  // Clear cutouts
+  var cutoutsDir = path.join(tmp, 'kaycee_cutouts');
+  if (fs.existsSync(cutoutsDir)) {
+    try {
+      var files = fs.readdirSync(cutoutsDir);
+      for (var i = 0; i < files.length; i++) {
+        try {
+          fs.unlinkSync(path.join(cutoutsDir, files[i]));
+          count++;
+        } catch (e) {}
+      }
+    } catch (e) {}
+  }
+
+  // Clear audio stems folders
+  try {
+    var items = fs.readdirSync(tmp);
+    for (var j = 0; j < items.length; j++) {
+      if (items[j].indexOf('kaycee_stems_') === 0) {
+        var folder = path.join(tmp, items[j]);
+        try {
+          if (fs.rmSync) {
+            fs.rmSync(folder, { recursive: true, force: true });
+          } else {
+            deleteFolderRecursive(folder);
+          }
+          count++;
+        } catch (e) {}
+      }
+    }
+  } catch (e) {}
+
+  updateCacheStats();
+  alert('🧹 Cache temporary AI berhasil dibersihkan! (' + count + ' item dihapus)');
+}
+
+function openTempFolder() {
+  if (!os || !child_process) return;
+  var tmp = os.tmpdir();
+  if (process.platform === 'win32') {
+    child_process.exec('explorer "' + tmp + '"');
+  } else if (process.platform === 'darwin') {
+    child_process.exec('open "' + tmp + '"');
+  }
+}
+
+function autoCleanOldCache() {
+  if (!os || !fs || !path) return;
+  var tmp = os.tmpdir();
+  var maxAgeMs = 24 * 60 * 60 * 1000;
+  var now = Date.now();
+
+  try {
+    var items = fs.readdirSync(tmp);
+    for (var i = 0; i < items.length; i++) {
+      if (items[i].indexOf('kaycee_stems_') === 0) {
+        var folder = path.join(tmp, items[i]);
+        try {
+          var stat = fs.statSync(folder);
+          if (now - stat.mtimeMs > maxAgeMs) {
+            if (fs.rmSync) {
+              fs.rmSync(folder, { recursive: true, force: true });
+            } else {
+              deleteFolderRecursive(folder);
+            }
+          }
+        } catch (e) {}
+      }
+    }
+
+    var cutoutsDir = path.join(tmp, 'kaycee_cutouts');
+    if (fs.existsSync(cutoutsDir)) {
+      var cFiles = fs.readdirSync(cutoutsDir);
+      for (var k = 0; k < cFiles.length; k++) {
+        var cPath = path.join(cutoutsDir, cFiles[k]);
+        try {
+          var cStat = fs.statSync(cPath);
+          if (now - cStat.mtimeMs > maxAgeMs) {
+            fs.unlinkSync(cPath);
+          }
+        } catch (e) {}
+      }
+    }
+  } catch (e) {}
 }
 
 // ── Init ─────────────────────────────────────────────────────
 loadSettings();
 initNavTabs();
+autoCleanOldCache();
 
 if (window.KayceeAudioSeparator) {
   window.KayceeAudioSeparator.init();
 }
+
+if (window.KayceeBgRemover) {
+  window.KayceeBgRemover.init();
+}
+

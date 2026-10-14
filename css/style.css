@@ -1642,7 +1642,47 @@ button.icon-btn {
   line-height: 1.3;
 }
 
+/* ── AI Cache & Temp Storage Manager ───────────────────────── */
+.cache-stat-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 9.5px;
+  color: var(--text-secondary);
+  padding: 2.5px 0;
+}
 
+.cache-stat-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
 
+.cache-stat-val {
+  font-size: 9.5px;
+  font-weight: 600;
+  color: var(--text-primary);
+  font-family: monospace;
+}
 
+.cache-actions-row {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.cache-actions-row .btn-subtle {
+  flex: 1;
+}
+
+.btn-subtle.danger-text {
+  color: #ff6b8b;
+  border-color: rgba(255, 107, 139, 0.3);
+}
+
+.btn-subtle.danger-text:hover {
+  background: rgba(255, 107, 139, 0.15);
+  border-color: rgba(255, 107, 139, 0.5);
+  color: #ff4770;
+}
 

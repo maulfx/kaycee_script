@@ -15,6 +15,7 @@
 Panel dilengkapi dengan navigasi tab atas yang rapi dan terorganisir:
 * **✨ Tools (Main Tools)**: Berisi semua alat inti komposisi, manajemen resolusi (Comp Size), frame rate (Comp FPS), dan pengaturan layer.
 * **🎵 Audio AI (Vocal & Music Separation)**: Tab khusus bertenaga AI untuk memisahkan vokal dan musik instrumental secara lokal dari layer audio/video apa pun di timeline After Effects!
+* **✂️ Bg Remover (AI Image Cutout)**: Tab bertenaga AI lokal untuk menghapus latar belakang gambar/foto (PNG, JPG, PSD, WebP) dengan kualitas sekelas PhotoRoom dan otomatis meletakkannya di timeline!
 
 ---
 
@@ -42,6 +43,24 @@ Pisahkan suara vokal dan musik langsung dari layer timeline After Effects hanya 
   * Opsi checkbox untuk otomatis mematikan suara (*mute*) pada layer sumber asli.
 * **💡 Tips Memutar Stem di AE**:
   * Karena kedua layer (`Music` dan `Vocal`) dimasukkan ke timeline, keduanya dalam keadaan aktif. Jika ingin mendengarkan instrumental saja, matikan ikon speaker (**Mute**) pada layer `Vocal`, atau klik ikon **Solo** pada layer `Music`.
+
+---
+
+### 2. ✂️ AI Image Background Remover (PhotoRoom-Grade Cutout)
+Hapus background foto atau gambar secara instan langsung dari layer After Effects tanpa perlu buka browser atau upload foto ke website pihak ketiga:
+
+* **⚡ 2 Pilihan Kualitas AI**:
+  * **⚡ Fast Quality (`u2netp`)**:
+    * Model ultra-ringan (~4.5 MB).
+    * Proses selesai dalam **1 – 2 detik saja!** Sangat pas untuk *rough cut*, *drafting*, dan aset grafis cepat.
+  * **👑 Studio Quality (`BiRefNet` - PhotoRoom Grade)**:
+    * Menggunakan arsitektur AI *Dichotomous Image Segmentation* (**BiRefNet**) terbaru 2024–2025.
+    * Kualitas potongan sekelas PhotoRoom: sangat presisi pada **helai rambut tipis, bulu halus, tepi transparan, dan detail objek kompleks**.
+* **🎯 100% Pixel-Perfect Timeline Integration**:
+  * Layer transparan baru otomatis memiliki **Posisi, Skala (Scale), Rotasi, Anchor Point, dan In/Out Point** yang sama persis dengan foto aslinya.
+  * Opsi checkbox untuk otomatis menyembunyikan (*Hide / Eye off*) layer foto asli di timeline.
+* **🔒 100% Offline & Private**:
+  * Semua proses AI berjalan langsung di memori komputer Anda. Tidak ada kuota, tidak ada biaya API, dan data project rahasia Anda tidak pernah dikirim ke internet.
 
 ---
 
@@ -200,15 +219,18 @@ Kaycee-CEP/
 │   └── manifest.xml       # Konfigurasi ekstensi CEP, versi host AE & Node.js flags
 ├── bin/
 │   ├── ffmpeg.exe         # Portable Standalone FFmpeg (Plug-and-play)
+│   ├── remove_bg.py       # Python AI Background Remover (u2netp & BiRefNet)
 │   ├── separate.py        # Python entry-point bridge untuk audio-separator CLI
 │   ├── setup-engine.bat   # 1-Click installer launcher (Batch file)
 │   └── setup-engine.ps1   # PowerShell automated setup script (Python & AI packages)
 ├── css/
 │   └── style.css          # Desain antarmuka Glassmorphism, animations & styling
-├── fonts/                 # File font lokal (DM Sans, Syne)
+├── fonts/
+│   └── HugMeTight.ttf     # Custom title font
 ├── js/
 │   ├── CSInterface.js     # Library penghubung Adobe CEP dengan After Effects
 │   ├── audioSeparator.js  # Engine pemisah audio AI, process spawn & file importer
+│   ├── bgRemover.js       # Controller AI Image Cutout, process spawn & timeline align
 │   └── main.js            # Logika panel, event handlers, tab navigation, & state
 ├── jsx/
 │   └── main.jsx           # ExtendScript backend untuk manipulasi layer & project AE
@@ -226,6 +248,13 @@ Kaycee-CEP/
   * Klik ikon speaker (**Mute**) pada layer `Vocal`, atau klik tombol **Solo** (ikon lingkaran) pada layer `Music`.
 * **Ingin Hasil Instrumental 100% Bersih?**:
   * Gunakan opsi **👑 Studio Quality (BS-RoFormer)**. Mode ini menghasilkan pemisahan vokal dan instrumen kualitas studio tanpa ada suara vokal yang bocor (*zero bleed*).
+* **AI Image Background Remover (Bg Remover)**:
+  * Dilengkapi 2 model AI kelas atas: **✂️ Detail Quality (IS-Net DIS)** (Spesialis helaian rambut halus, bulu, kaca transparan, dan tepian rumit) dan **👑 Ultra Quality (BiRefNet Flagship)** (Model Flagship SOTA untuk objek umum, produk, studio compositing).
+  * Layer hasil potongan transparan (*cutout*) otomatis diposisikan presisi persis di atas layer asli di timeline dengan koordinat posisi, scale, anchor point, dan timing yang sama.
+* **Pembersihan Cache AI (Audio Stems & Cutout Images)**:
+  * File sementara (*temporary*) hasil pemisahan audio dan potongan gambar tersimpan di folder `Temp` sistem.
+  * Anda dapat memantau dan menghapus cache kapan saja melalui menu **Preferences (⚙️)** > **AI Temp Cache & Storage** > **Clear Temp Cache**.
+  * Panel juga otomatis membersihkan file sementara yang berumur lebih dari 24 jam saat pertama kali dibuka.
 * **Shortcut Shift**:
   * Tombol `Pre-Comp`, `M / T`, `NULL / ADJ`, `SLD / CMRA`, dan `Fit to Comp` memiliki fungsi alternatif ketika ditekan bersamaan dengan tombol **Shift**.
 

@@ -70,11 +70,11 @@ $env:Path = "$pyDir;$scriptsDir;" + $env:Path
 # ----------------------------------------------------
 # STEP 2: Install AI Packages & FFmpeg helper
 # ----------------------------------------------------
-Write-Host "`n[2/4] Installing AI packages (audio-separator, onnxruntime, static-ffmpeg)..."
+Write-Host "`n[2/4] Installing AI packages (audio-separator, rembg, onnxruntime, static-ffmpeg)..."
 Write-Host "This process may take 1-3 minutes depending on your internet connection..."
 
 & $pythonExe -m pip install --upgrade pip --quiet
-& $pythonExe -m pip install "audio-separator" "onnxruntime" "static-ffmpeg"
+& $pythonExe -m pip install "audio-separator" "rembg" "onnxruntime" "static-ffmpeg"
 
 # ----------------------------------------------------
 # STEP 3: Setup Standalone FFmpeg (Plug & Play)
