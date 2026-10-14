@@ -1016,5 +1016,39 @@ function loadSettings() {
   renderCompFpsButtons();
 }
 
+// ── Top Navbar & Tabs ────────────────────────────────────────
+function initNavTabs() {
+  var navBtns = document.querySelectorAll('.nav-btn');
+  navBtns.forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var targetTabId = this.getAttribute('data-tab');
+      if (!targetTabId) return;
+
+      // Update active nav button
+      navBtns.forEach(function (b) { b.classList.remove('active'); });
+      this.classList.add('active');
+
+      // Update active tab content
+      var tabContents = document.querySelectorAll('.tab-content');
+      tabContents.forEach(function (tc) { tc.classList.remove('active'); });
+
+      var targetContent = document.getElementById(targetTabId);
+      if (targetContent) {
+        targetContent.classList.add('active');
+      }
+
+      // If switching to Audio AI, auto-detect layer
+      if (targetTabId === 'tab-audio' && window.KayceeAudioSeparator) {
+        window.KayceeAudioSeparator.detect();
+      }
+    });
+  });
+}
+
 // ── Init ─────────────────────────────────────────────────────
 loadSettings();
+initNavTabs();
+
+if (window.KayceeAudioSeparator) {
+  window.KayceeAudioSeparator.init();
+}

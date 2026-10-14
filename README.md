@@ -4,13 +4,36 @@
 [![Platform](https://img.shields.io/badge/Platform-Windows%20%7C%20macOS-00F0FF?style=flat)](#)
 [![Interface](https://img.shields.io/badge/UI-Modern%20Glassmorphism-a855f7?style=flat)](#)
 
-**Kaycee CEP** adalah extension panel serbaguna dan modern untuk Adobe After Effects yang dirancang untuk mempercepat alur kerja (*workflow*) editing & motion graphics. Dilengkapi dengan antarmuka **Glassmorphism**, kustomisasi tema dinamis, video/image background, serta tombol cepat 1-klik untuk pengaturan komposisi dan layer.
+**Kaycee CEP** adalah extension panel serbaguna dan modern untuk Adobe After Effects yang dirancang untuk mempercepat alur kerja (*workflow*) editing & motion graphics. Dilengkapi dengan antarmuka **Glassmorphism**, kustomisasi tema dinamis, video/image background, **Top Navbar navigasi tab**, **AI Audio Separation (Vocal/Music)**, serta tombol cepat 1-klik untuk pengaturan komposisi dan layer.
 
 ---
 
 ## 🚀 Fitur Utama
 
-### 1. 📐 Composition Quick Tools
+### 🧭 Top Navigation Bar (Segmented Tabs)
+The panel features a sleek top navigation bar to keep workflows clean and organized:
+* **✨ Tools (Main Tools)**: Houses all core composition, comp size, comp FPS, and layer management tools.
+* **🎵 Audio AI (Vocal & Music Separation)**: Dedicated AI-powered tab to isolate vocals and instrumental stems from any active video or audio layer in After Effects!
+
+---
+
+### 1. 🎵 AI Audio Separator (Vocal & Music Stems)
+Separate vocals and instrumental tracks directly from timeline audio/video layers with 1 click:
+* **🚀 1-Click Engine Auto-Setup (Zero CMD)**:
+  * Non-technical users do not need to open CMD, install Python, or configure PATH manually!
+  * Click **`🚀 1-Click Engine Auto-Setup`** in the panel, and it will silently download and configure the AI engine in the background.
+* **⚡ Quality Modes**:
+  * **⚡ Fast Quality**: Ultra-fast separation, very low resource usage (~2GB VRAM/CPU), ideal for draft and quick timeline editing.
+  * **👑 Studio Quality**: State-of-the-Art Transformer model. Crystal-clear vocal isolation with pristine clarity.
+* **Automatic Layer Creation**:
+  * Automatically creates synced layers in After Effects named:
+    * `Vocal Fast Quality` / `Vocal Studio Quality`
+    * `Music Fast Quality` / `Music Studio Quality`
+  * Optional checkbox to automatically mute the original video/audio layer.
+
+---
+
+### 2. 📐 Composition Quick Tools
 * **Pre-Comp**:
   * **Klik Biasa**: Melakukan Pre-Compose pada setiap layer terpilih secara terpisah (satu per satu).
   * **Shift + Klik**: Menggabungkan seluruh layer terpilih ke dalam satu Pre-Comp bersamaan.

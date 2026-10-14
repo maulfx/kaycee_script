@@ -659,5 +659,128 @@ function kaycee_setCompFps(fps) {
     }
 }
 
+// ── Audio Separation Helpers ─────────────────────────────────
+
+// Get currently selected layer's audio file info
+function kaycee_getSelectedAudioLayer() {
+    try {
+        var comp = kaycee_getComp();
+        if (!comp) return _err("No active composition in After Effects.");
+
+        var layers = comp.selectedLayers;
+        if (!layers || layers.length === 0) {
+            return _err("Please select an audio or video layer in the timeline first.");
+        }
+
+        var lyr = layers[0];
+        if (!lyr.source || !lyr.source.file) {
+            return _err("Layer '" + lyr.name + "' is not a media file on disk (must be audio/video).");
+        }
+
+        var file = lyr.source.file;
+        var info = {
+            ok: true,
+            name: lyr.name,
+            filePath: file.fsName,
+            hasAudio: lyr.hasAudio,
+            inPoint: lyr.inPoint,
+            outPoint: lyr.outPoint,
+            startTime: lyr.startTime,
+            index: lyr.index
+        };
+
+        return JSON.stringify(info);
+    } catch (e) {
+        return _err("Failed to detect audio layer: " + e.toString());
+    }
+}
+
+// Import isolated stem files back into AE and align in timeline
+function kaycee_importAndAddStems(vocalsPath, instPath, targetLayerIndex, muteOriginal, qualityLabel) {
+    try {
+        var comp = kaycee_getComp();
+        if (!comp) return _err("No active composition in After Effects.");
+
+        app.beginUndoGroup("Kaycee Audio Separation Import");
+
+        var targetLayer = null;
+        if (targetLayerIndex && targetLayerIndex <= comp.numLayers) {
+            targetLayer = comp.layer(targetLayerIndex);
+        }
+
+        var inPoint = targetLayer ? targetLayer.inPoint : 0;
+        var outPoint = targetLayer ? targetLayer.outPoint : comp.duration;
+        var startTime = targetLayer ? targetLayer.startTime : 0;
+
+        var qLabel = (qualityLabel && qualityLabel !== "") ? qualityLabel : "Fast Quality";
+        var importedCount = 0;
+
+        // Import Instrumental Stem (if path provided)
+        if (instPath && instPath !== "") {
+            var instFile = new File(instPath);
+            if (!instFile.exists) {
+                app.endUndoGroup();
+                return _err("Music file not found on disk: " + instPath);
+            }
+            var instImport = new ImportOptions(instFile);
+            var instItem = app.project.importFile(instImport);
+            try { instItem.name = "Music " + qLabel; } catch(e) {}
+            var instLayer = comp.layers.add(instItem);
+            try { instLayer.name = "Music " + qLabel; } catch(e) {}
+            instLayer.startTime = startTime;
+            instLayer.inPoint = inPoint;
+            instLayer.outPoint = outPoint;
+            if (targetLayer) {
+                try {
+                    instLayer.moveBefore(targetLayer);
+                } catch(e) {}
+            }
+            importedCount++;
+        }
+
+        // Import Vocals Stem (if path provided)
+        if (vocalsPath && vocalsPath !== "") {
+            var vocFile = new File(vocalsPath);
+            if (!vocFile.exists) {
+                app.endUndoGroup();
+                return _err("Vocal file not found on disk: " + vocalsPath);
+            }
+            var vocImport = new ImportOptions(vocFile);
+            var vocItem = app.project.importFile(vocImport);
+            try { vocItem.name = "Vocal " + qLabel; } catch(e) {}
+            var vocLayer = comp.layers.add(vocItem);
+            try { vocLayer.name = "Vocal " + qLabel; } catch(e) {}
+            vocLayer.startTime = startTime;
+            vocLayer.inPoint = inPoint;
+            vocLayer.outPoint = outPoint;
+            if (targetLayer) {
+                try {
+                    vocLayer.moveBefore(targetLayer);
+                } catch(e) {}
+            }
+            importedCount++;
+        }
+
+        if (importedCount === 0) {
+            app.endUndoGroup();
+            return _err("No audio stems were imported. Check if files exist.");
+        }
+
+        // Mute original layer's audio if requested
+        if (muteOriginal && targetLayer && targetLayer.hasAudio) {
+            try {
+                targetLayer.audioEnabled = false;
+            } catch(e) {}
+        }
+
+        app.endUndoGroup();
+        return _ok();
+    } catch (e) {
+        try { app.endUndoGroup(); } catch(ex) {}
+        return _err("Failed to import audio stems into AE: " + e.toString());
+    }
+}
+
+
 
 

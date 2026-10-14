@@ -23,11 +23,35 @@
       <span class="title">Kaycee</span>
     </div>
 
+    <!-- Top Navigation Bar -->
+    <div id="nav-bar" class="nav-bar">
+      <button id="nav-btn-tools" class="nav-btn active" data-tab="tab-tools" title="Main Composition & Layer Tools">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="7" height="7"></rect>
+          <rect x="14" y="3" width="7" height="7"></rect>
+          <rect x="14" y="14" width="7" height="7"></rect>
+          <rect x="3" y="14" width="7" height="7"></rect>
+        </svg>
+        <span>Tools</span>
+      </button>
+      <button id="nav-btn-audio" class="nav-btn" data-tab="tab-audio" title="AI Audio Separation (Vocals & Music)">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 18V5l12-2v13"></path>
+          <circle cx="6" cy="18" r="3"></circle>
+          <circle cx="18" cy="16" r="3"></circle>
+        </svg>
+        <span>Audio AI</span>
+      </button>
+    </div>
+
     <hr class="divider" />
 
-    <!-- COMPOSITION -->
-    <div id="section-comp" class="section-wrap">
-      <div class="section-label">Composition</div>
+    <!-- TAB 1: MAIN TOOLS -->
+    <div id="tab-tools" class="tab-content active">
+
+      <!-- COMPOSITION -->
+      <div id="section-comp" class="section-wrap">
+        <div class="section-label">Composition</div>
       <div class="row stretch">
         <button id="btn-precomp" title="Pre-Comp each selected layer individually | Shift: all into one">Pre-Comp</button>
         <button id="btn-mt"      title="Twixtor Pro | Shift: Motion Tile">M / T</button>
@@ -173,6 +197,79 @@
       <label for="opacity-input">Opacity %</label>
       <input id="opacity-input" type="number" value="100" min="0" max="100" />
     </div>
+
+    </div> <!-- /#tab-tools -->
+
+    <!-- TAB 2: AI AUDIO SEPARATION -->
+    <div id="tab-audio" class="tab-content">
+
+      <!-- AI Model Selection -->
+      <div class="section-wrap">
+        <div class="section-label">AI Model</div>
+        <div class="model-select-grid">
+          <!-- Fast Quality -->
+          <div class="model-card active" id="model-card-fast" data-model="fast">
+            <div class="model-title">⚡ Fast Quality</div>
+          </div>
+
+          <!-- Studio Quality -->
+          <div class="model-card" id="model-card-quality" data-model="quality">
+            <div class="model-title">👑 Studio Quality</div>
+          </div>
+        </div>
+      </div>
+
+      <hr class="divider" />
+
+      <!-- Stem Options -->
+      <div class="section-wrap">
+        <div class="section-label">Output Options</div>
+        <div class="audio-options-list">
+          <label class="audio-checkbox-label">
+            <input type="checkbox" id="chk-audio-mute-original" checked />
+            <span>Mute original layer in AE</span>
+          </label>
+          <div class="audio-checkbox-group">
+            <label class="audio-checkbox-label">
+              <input type="checkbox" id="chk-audio-import-vocals" checked />
+              <span>Import Vocal</span>
+            </label>
+            <label class="audio-checkbox-label">
+              <input type="checkbox" id="chk-audio-import-inst" checked />
+              <span>Import Music</span>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <hr class="divider" />
+
+      <!-- Execution & Progress -->
+      <div class="section-wrap">
+        <button id="btn-audio-separate" class="btn-audio-primary" title="Separate Audio and Import to Timeline">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2">
+            <circle cx="6" cy="6" r="3"></circle>
+            <circle cx="6" cy="18" r="3"></circle>
+            <line x1="20" y1="4" x2="8.12" y2="15.88"></line>
+            <line x1="14.47" y1="14.48" x2="20" y2="20"></line>
+            <line x1="8.12" y1="8.12" x2="12" y2="12"></line>
+          </svg>
+          <span id="btn-audio-separate-text">Separate Audio & Import</span>
+        </button>
+
+        <!-- Progress Box -->
+        <div id="audio-status-box" class="audio-status-box collapsed">
+          <div class="audio-status-header">
+            <span id="audio-status-text">Ready</span>
+            <span id="audio-status-percent">0%</span>
+          </div>
+          <div class="audio-progress-bar-wrap">
+            <div id="audio-progress-bar" class="audio-progress-bar" style="width: 0%;"></div>
+          </div>
+        </div>
+      </div>
+
+    </div> <!-- /#tab-audio -->
 
     <hr class="divider" />
 
@@ -334,6 +431,7 @@
   </div>
 
   <script src="js/CSInterface.js"></script>
+  <script src="js/audioSeparator.js"></script>
   <script src="js/main.js"></script>
 </body>
 </html>
