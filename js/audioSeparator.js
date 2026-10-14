@@ -66,6 +66,71 @@
     checkEngineStatus();
   }
 
+  function getCustomEnv() {
+    var env = Object.assign({}, process.env);
+    var userHome = process.env.USERPROFILE || process.env.HOME || '';
+    var localApp = process.env.LOCALAPPDATA || (userHome + '\\AppData\\Local');
+
+    var currentDir = window.location.pathname;
+    if (process.platform === 'win32' && currentDir.startsWith('/')) {
+      currentDir = currentDir.substring(1);
+    }
+    var panelRoot = path.dirname(decodeURIComponent(currentDir));
+    var binDir = path.join(panelRoot, 'bin');
+
+    var extraPaths = [
+      binDir,
+      path.join(binDir, 'ffmpeg'),
+      path.join(localApp, 'Programs', 'Python', 'Python311', 'Scripts'),
+      path.join(localApp, 'Programs', 'Python', 'Python311'),
+      path.join(localApp, 'Programs', 'Python', 'Python312', 'Scripts'),
+      path.join(localApp, 'Programs', 'Python', 'Python312'),
+      path.join(localApp, 'Programs', 'Python', 'Python310', 'Scripts'),
+      path.join(localApp, 'Programs', 'Python', 'Python310'),
+      path.join(localApp, 'Programs', 'Python', 'Python313', 'Scripts'),
+      path.join(localApp, 'Programs', 'Python', 'Python313'),
+      path.join(localApp, 'Microsoft', 'WinGet', 'Links'),
+      'C:\\Program Files\\Python311\\Scripts',
+      'C:\\Program Files\\Python311',
+      'C:\\Program Files\\Python312\\Scripts',
+      'C:\\Program Files\\Python312',
+      'C:\\ffmpeg\\bin',
+      'C:\\Program Files\\ffmpeg\\bin',
+      'C:\\Windows\\System32'
+    ];
+
+    try {
+      var wingetPkgs = path.join(localApp, 'Microsoft', 'WinGet', 'Packages');
+      if (fs && fs.existsSync(wingetPkgs)) {
+        var dirs = fs.readdirSync(wingetPkgs);
+        for (var i = 0; i < dirs.length; i++) {
+          if (dirs[i].toLowerCase().indexOf('ffmpeg') !== -1) {
+            var fullPkg = path.join(wingetPkgs, dirs[i]);
+            extraPaths.push(fullPkg);
+            var subList = fs.readdirSync(fullPkg);
+            for (var j = 0; j < subList.length; j++) {
+              var sPath = path.join(fullPkg, subList[j]);
+              if (fs.statSync(sPath).isDirectory()) {
+                extraPaths.push(sPath);
+                var binSub = path.join(sPath, 'bin');
+                if (fs.existsSync(binSub)) extraPaths.push(binSub);
+              }
+            }
+          }
+        }
+      }
+    } catch (e) {}
+
+    var validExtras = extraPaths.filter(function (p) {
+      try { return fs && fs.existsSync(p); } catch (e) { return false; }
+    });
+
+    var existingPath = env.PATH || env.Path || '';
+    env.PATH = validExtras.join(';') + ';' + existingPath;
+    env.Path = env.PATH;
+    return env;
+  }
+
   function getPythonExecutable() {
     if (process.platform === 'win32') {
       var userHome = process.env.USERPROFILE || process.env.HOME || '';
@@ -73,9 +138,14 @@
       var candidates = [
         path.join(localApp, 'Programs', 'Python', 'Python311', 'python.exe'),
         path.join(localApp, 'Programs', 'Python', 'Python312', 'python.exe'),
+        path.join(localApp, 'Programs', 'Python', 'Python310', 'python.exe'),
+        path.join(localApp, 'Programs', 'Python', 'Python313', 'python.exe'),
         'C:\\Program Files\\Python311\\python.exe',
         'C:\\Program Files\\Python312\\python.exe',
-        'C:\\Python311\\python.exe'
+        'C:\\Program Files\\Python310\\python.exe',
+        'C:\\Python311\\python.exe',
+        'C:\\Python312\\python.exe',
+        'C:\\Python310\\python.exe'
       ];
       for (var i = 0; i < candidates.length; i++) {
         if (fs && fs.existsSync(candidates[i])) {
@@ -93,7 +163,10 @@
       var candidates = [
         path.join(localApp, 'Programs', 'Python', 'Python311', 'Scripts', 'audio-separator.exe'),
         path.join(localApp, 'Programs', 'Python', 'Python312', 'Scripts', 'audio-separator.exe'),
-        'C:\\Program Files\\Python311\\Scripts\\audio-separator.exe'
+        path.join(localApp, 'Programs', 'Python', 'Python310', 'Scripts', 'audio-separator.exe'),
+        path.join(localApp, 'Programs', 'Python', 'Python313', 'Scripts', 'audio-separator.exe'),
+        'C:\\Program Files\\Python311\\Scripts\\audio-separator.exe',
+        'C:\\Program Files\\Python312\\Scripts\\audio-separator.exe'
       ];
       for (var i = 0; i < candidates.length; i++) {
         if (fs && fs.existsSync(candidates[i])) {
@@ -102,6 +175,19 @@
       }
     }
     return 'audio-separator';
+  }
+
+  function getSeparateScriptPath() {
+    try {
+      var currentDir = window.location.pathname;
+      if (process.platform === 'win32' && currentDir.startsWith('/')) {
+        currentDir = currentDir.substring(1);
+      }
+      var panelRoot = path.dirname(decodeURIComponent(currentDir));
+      return path.join(panelRoot, 'bin', 'separate.py');
+    } catch (e) {
+      return 'bin/separate.py';
+    }
   }
 
   /**
@@ -116,58 +202,37 @@
 
     if (elEngineTitle) elEngineTitle.textContent = 'Checking engine status...';
 
-    // 1. Check direct audio-separator executable path
-    var sepExe = getAudioSeparatorExecutable();
-    var testProc = child_process.spawn(sepExe, ['--version'], {
+    var pyExe = getPythonExecutable();
+    var sepScript = getSeparateScriptPath();
+
+    var testProc = child_process.spawn(pyExe, [sepScript, '--version'], {
       windowsHide: true,
-      shell: true
+      env: getCustomEnv()
     });
 
     var hasResponded = false;
+    var outText = '';
 
     testProc.stdout.on('data', function (d) {
-      var str = d.toString().toLowerCase();
-      if (str.indexOf('audio-separator') !== -1 || str.indexOf('version') !== -1 || str.match(/\d+\.\d+/)) {
+      var str = d.toString();
+      outText += str;
+      if (str.toLowerCase().indexOf('separate.py') !== -1 || str.toLowerCase().indexOf('audio-separator') !== -1 || str.match(/\d+\.\d+/)) {
         hasResponded = true;
       }
     });
 
     testProc.stderr.on('data', function (d) {
-      var str = d.toString().toLowerCase();
-      if (str.indexOf('audio-separator') !== -1) {
-        hasResponded = true;
-      }
+      var str = d.toString();
+      outText += str;
     });
 
     testProc.on('close', function (code) {
-      if (code === 0 || hasResponded) {
-        setEngineStatus(true, 'audio-separator (MDX & RoFormer active)');
-        if (typeof callback === 'function') callback(true);
-      } else {
-        // 2. Check via python -m
-        checkViaPython(callback);
-      }
-    });
+      var isReady = (code === 0 && hasResponded) &&
+                    outText.indexOf('Error') === -1 &&
+                    outText.indexOf('ModuleNotFoundError') === -1;
 
-    testProc.on('error', function () {
-      checkViaPython(callback);
-    });
-  }
-
-  function checkViaPython(callback) {
-    var pyExe = getPythonExecutable();
-    var pyProc = child_process.spawn(pyExe, ['-m', 'audio_separator.utils.cli', '--version'], {
-      windowsHide: true,
-      shell: true
-    });
-
-    var ok = false;
-    pyProc.stdout.on('data', function () { ok = true; });
-    pyProc.stderr.on('data', function () { ok = true; });
-
-    pyProc.on('close', function (code) {
-      if (code === 0 || ok) {
-        setEngineStatus(true, 'audio-separator (MDX & RoFormer active)');
+      if (isReady) {
+        setEngineStatus(true, 'AI Engine: Ready (MDX & RoFormer active)');
         if (typeof callback === 'function') callback(true);
       } else {
         setEngineStatus(false, 'AI Engine not installed. Click button to install.');
@@ -175,7 +240,7 @@
       }
     });
 
-    pyProc.on('error', function () {
+    testProc.on('error', function () {
       setEngineStatus(false, 'AI Engine not installed. Click button to install.');
       if (typeof callback === 'function') callback(false);
     });
@@ -241,7 +306,8 @@
       '-NoProfile',
       '-File', scriptPath
     ], {
-      windowsHide: true
+      windowsHide: true,
+      env: getCustomEnv()
     });
 
     var outputLogs = '';
@@ -251,14 +317,16 @@
       outputLogs += str;
       console.log('[setup-engine]', str);
 
-      if (str.indexOf('[1/3]') !== -1) {
-        updateProgress(20, 'Checking / Installing Python...', str.trim());
-      } else if (str.indexOf('[2/3]') !== -1) {
-        updateProgress(50, 'Installing audio-separator...', str.trim());
-      } else if (str.indexOf('[3/3]') !== -1) {
-        updateProgress(85, 'Verifying engine...', str.trim());
+      if (str.indexOf('[1/4]') !== -1 || str.indexOf('[1/3]') !== -1) {
+        updateProgress(15, 'Checking / Installing Python...', str.trim());
+      } else if (str.indexOf('[2/4]') !== -1 || str.indexOf('[2/3]') !== -1) {
+        updateProgress(45, 'Installing AI packages & FFmpeg helper...', str.trim());
+      } else if (str.indexOf('[3/4]') !== -1) {
+        updateProgress(75, 'Configuring standalone FFmpeg...', str.trim());
+      } else if (str.indexOf('[4/4]') !== -1) {
+        updateProgress(90, 'Pre-downloading AI model...', str.trim());
       } else {
-        updateProgress(65, 'Downloading packages...', str.trim());
+        updateProgress(60, 'Setting up dependencies...', str.trim());
       }
     });
 
@@ -404,17 +472,20 @@
 
         updateProgress(20, 'Separating (' + qualityLabel + ')...');
 
+        var sepScript = getSeparateScriptPath();
+        var pyExe = getPythonExecutable();
+
         var cmdArgs = [
+          sepScript,
           '-m', modelArg,
           '--output_dir', outDir,
           '--output_format', 'WAV',
           sourceFile
         ];
 
-        var sepExe = getAudioSeparatorExecutable();
-        var proc = child_process.spawn(sepExe, cmdArgs, {
+        var proc = child_process.spawn(pyExe, cmdArgs, {
           windowsHide: true,
-          shell: true
+          env: getCustomEnv()
         });
 
         var logAccumulator = '';
@@ -445,6 +516,7 @@
 
         proc.stderr.on('data', function (data) {
           var str = data.toString();
+          logAccumulator += str;
           console.warn('[audio-separator stderr]', str);
           if (str.indexOf('%') !== -1) {
             var match = str.match(/(\d+)%/);
@@ -464,14 +536,14 @@
 
         proc.on('error', function (err) {
           console.error('[audio-separator spawn error]', err);
-          tryPythonFallback(sourceFile, modelArg, outDir, layerRes);
+          handleSeparationFailure('Process error: ' + err.message);
         });
 
         proc.on('close', function (code) {
           if (code === 0) {
             handleSeparationSuccess(outDir, sourceFile, layerRes);
           } else {
-            tryPythonFallback(sourceFile, modelArg, outDir, layerRes);
+            handleSeparationFailure('Separation failed (Exit code ' + code + '):\n' + logAccumulator);
           }
         });
       });
@@ -495,74 +567,6 @@
     }
 
     proceed();
-  }
-
-  function tryPythonFallback(sourceFile, modelArg, outDir, layerRes) {
-    updateProgress(25, 'Running via Python engine...');
-
-    var pyArgs = [
-      '-m', 'audio_separator.utils.cli',
-      '-m', modelArg,
-      '--output_dir', outDir,
-      '--output_format', 'WAV',
-      sourceFile
-    ];
-
-    var pyExe = getPythonExecutable();
-    var pyProc = child_process.spawn(pyExe, pyArgs, {
-      windowsHide: true,
-      shell: true
-    });
-
-    var pyLog = '';
-    var pyPhase1Done = false;
-
-    pyProc.stdout.on('data', function (data) {
-      pyLog += data.toString();
-      var str = data.toString();
-      if (str.indexOf('%') !== -1) {
-        var match = str.match(/(\d+)%/);
-        if (match) {
-          var p = parseInt(match[1], 10);
-          if (!pyPhase1Done) {
-            updateProgress(25 + (p * 0.45), 'Separating audio ' + p + '%');
-            if (p >= 98) pyPhase1Done = true;
-          } else {
-            updateProgress(70 + (p * 0.2), 'Writing stems ' + p + '%');
-          }
-        }
-      } else if (str.indexOf('Saving') !== -1) {
-        updateProgress(90, 'Writing audio stems...');
-      }
-    });
-
-    pyProc.stderr.on('data', function (data) {
-      var str = data.toString();
-      if (str.indexOf('%') !== -1) {
-        var match = str.match(/(\d+)%/);
-        if (match) {
-          var p = parseInt(match[1], 10);
-          if (!pyPhase1Done) {
-            updateProgress(25 + (p * 0.45), 'Separating audio ' + p + '%');
-            if (p >= 98) pyPhase1Done = true;
-          } else {
-            updateProgress(70 + (p * 0.2), 'Writing stems ' + p + '%');
-          }
-        }
-      }
-    });
-
-    pyProc.on('error', function (err) {
-      handleSeparationFailure('Engine not ready: ' + err.message);
-    });
-
-    pyProc.on('close', function (code) {
-      if (code === 0) {
-        handleSeparationSuccess(outDir, sourceFile, layerRes);
-      } else {
-        handleSeparationFailure('Separation failed (Exit code ' + code + '):\n' + pyLog);
-      }
-    });
   }
 
   function reloadMainJSX(callback) {
@@ -599,10 +603,16 @@
       var fLower = f.toLowerCase();
       var fullPath = path.join(outDir, f);
 
-      if (fLower.indexOf('vocal') !== -1 && fLower.endsWith('.wav')) {
-        vocalsFile = fullPath;
-      } else if ((fLower.indexOf('instrumental') !== -1 || fLower.indexOf('music') !== -1 || fLower.indexOf('no_vocals') !== -1) && fLower.endsWith('.wav')) {
+      if (!fLower.endsWith('.wav') && !fLower.endsWith('.flac') && !fLower.endsWith('.mp3')) continue;
+
+      if (fLower.indexOf('(instrumental)') !== -1 || fLower.indexOf('_(instrumental)') !== -1 || fLower.indexOf('_instrumental') !== -1 || fLower.indexOf('(music)') !== -1) {
         instFile = fullPath;
+      } else if (fLower.indexOf('(vocals)') !== -1 || fLower.indexOf('_(vocals)') !== -1 || fLower.indexOf('_vocals') !== -1 || fLower.indexOf('(vocal)') !== -1) {
+        vocalsFile = fullPath;
+      } else if (fLower.indexOf('instrumental') !== -1 || fLower.indexOf('no_vocals') !== -1) {
+        instFile = fullPath;
+      } else if (fLower.indexOf('vocal') !== -1) {
+        vocalsFile = fullPath;
       }
     }
 
@@ -658,7 +668,16 @@
     if (elProgressBar) elProgressBar.style.width = '0%';
     if (elStatusPercent) elStatusPercent.textContent = '0%';
     if (elStatusText) elStatusText.textContent = 'Failed';
-    alert('Audio separation failed:\n' + errorMsg);
+
+    var tip = '';
+    var lower = (errorMsg || '').toLowerCase();
+    if (lower.indexOf('modulenotfounderror') !== -1 || lower.indexOf('no module named') !== -1) {
+      tip = '\n\n💡 Solusi:\nPaket AI belum terpasang di Python Anda.\nKlik tombol "🚀 1-Click Engine Auto-Setup" di panel ini (atau buka bin/setup-engine.bat) untuk memasangnya secara otomatis.';
+    } else if (lower.indexOf('ffmpeg') !== -1 || lower.indexOf('filenotfound') !== -1) {
+      tip = '\n\n💡 Solusi:\nFFmpeg tidak ditemukan.\nKlik tombol "🚀 1-Click Engine Auto-Setup" di panel ini untuk mengonfigurasinya otomatis.';
+    }
+
+    alert('Audio separation failed:\n' + errorMsg + tip);
     resetProcessingState();
   }
 
