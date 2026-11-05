@@ -62,14 +62,14 @@
       <!-- COMPOSITION -->
       <div id="section-comp" class="section-wrap">
         <div class="section-label">Composition</div>
-      <div class="row stretch">
-        <button id="btn-precomp" title="Pre-Comp each selected layer individually | Shift: all into one">Pre-Comp</button>
-        <button id="btn-mt"      title="Twixtor Pro | Shift: Motion Tile">M / T</button>
+        <div class="row stretch">
+          <button id="btn-precomp" title="Pre-Comp individually | Shift: into one | Ctrl: custom name">Pre-Comp</button>
+          <button id="btn-mt"      title="Twixtor Pro | Shift: Motion Tile">M / T</button>
+        </div>
+        <div class="row stretch">
+          <button id="btn-trim-remap" title="Trim selected layer's out-point to its last Time Remap keyframe">Trim Remap</button>
+        </div>
       </div>
-      <div class="row stretch">
-        <button id="btn-trim-remap" title="Trim selected layer's out-point to its last Time Remap keyframe">Trim Remap</button>
-      </div>
-    </div>
 
     <hr class="divider" />
 
@@ -539,6 +539,27 @@
       </button>
     </div>
 
+  </div>
+
+  <!-- PRE-COMP CUSTOM NAME MODAL -->
+  <div id="precomp-modal" class="modal-overlay">
+    <div class="modal-card">
+      <div class="modal-header">
+        <span class="modal-title">Pre-Comp Name</span>
+        <button id="btn-precomp-modal-close" class="modal-close-btn" title="Close">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <div class="modal-input-wrap">
+          <input type="text" id="modal-precomp-input" placeholder="name.." maxlength="28" autocomplete="off" spellcheck="false" />
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button id="btn-precomp-modal-reset" class="btn-subtle" title="Reset to default (1, 2, 3...)">Reset</button>
+        <button id="btn-precomp-modal-apply" class="btn-modal-primary" title="Apply & Pre-Comp">Precomp</button>
+      </div>
+    </div>
   </div>
 
   <script src="js/CSInterface.js"></script>

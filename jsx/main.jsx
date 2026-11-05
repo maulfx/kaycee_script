@@ -25,7 +25,8 @@ function _err(msg) {
 // ── Pre-Comp ─────────────────────────────────────────────────
 // shift = false → pre-comp each selected layer individually (one by one)
 // shift = true  → pre-comp ALL selected layers together into one precomp
-function kaycee_preComp(shift) {
+// customPrefix  → optional custom name prefix (e.g. "clip" → "clip 1", "clip 2"...)
+function kaycee_preComp(shift, customPrefix) {
     try {
         var comp = kaycee_getComp();
         if (!comp) return _err("No active composition.");
@@ -48,24 +49,40 @@ function kaycee_preComp(shift) {
                 if (layers[i].index    < topIndex)  topIndex = layers[i].index;
             }
 
-            var pcName = _uniquePcName(ids.length);
+            var pcNames = _getUniquePcNames(1, customPrefix, false);
+            var pcName = pcNames[0];
             comp.layers.precompose(ids, pcName, true);
             _fixPcLayer(comp, pcName, spanIn, spanOut, topIndex);
 
         } else {
             // ── No shift: tiap layer diprecomp sendiri-sendiri ────
-            // Proses dari index terbesar ke terkecil agar index tidak bergeser
-            // setelah tiap precompose.
-            var sorted = [];
-            for (var s = 0; s < layers.length; s++) sorted.push(layers[s]);
-            sorted.sort(function(a, b) { return b.index - a.index; });
+            // Urutkan layer berdasarkan urutan index aslinya dari atas ke bawah (index terkecil ke terbesar)
+            // agar penamaan (1, 2, 3... atau clip 1, clip 2...) konsisten dari layer atas ke bawah.
+            var sortedAsc = [];
+            for (var s = 0; s < layers.length; s++) sortedAsc.push(layers[s]);
+            sortedAsc.sort(function(a, b) { return a.index - b.index; });
 
-            for (var s = 0; s < sorted.length; s++) {
-                var lyr      = sorted[s];
+            // Alokasikan deretan nama unik untuk setiap layer
+            var names = _getUniquePcNames(sortedAsc.length, customPrefix, true);
+
+            var pairs = [];
+            for (var k = 0; k < sortedAsc.length; k++) {
+                pairs.push({
+                    layer: sortedAsc[k],
+                    name: names[k]
+                });
+            }
+
+            // Eksekusi precompose dari index terbesar ke terkecil agar index layer
+            // di atasnya tidak tergeser saat proses berjalan.
+            pairs.sort(function(a, b) { return b.layer.index - a.layer.index; });
+
+            for (var p = 0; p < pairs.length; p++) {
+                var lyr      = pairs[p].layer;
                 var spanIn   = lyr.inPoint;
                 var spanOut  = lyr.outPoint;
                 var topIndex = lyr.index;
-                var pcName   = _uniquePcName(1);
+                var pcName   = pairs[p].name;
                 comp.layers.precompose([lyr.index], pcName, true);
                 _fixPcLayer(comp, pcName, spanIn, spanOut, topIndex);
             }
@@ -79,19 +96,48 @@ function kaycee_preComp(shift) {
     }
 }
 
-// Cari nama precomp yang belum dipakai di project
-function _uniquePcName(layerCount) {
-    var baseName = (layerCount === 1) ? "" : "Pre-Comp ";
-    var num = 1;
-    while (true) {
-        var candidate = baseName + num;
-        var taken = false;
-        for (var p = 1; p <= app.project.numItems; p++) {
-            if (app.project.item(p).name === candidate) { taken = true; break; }
+// Alokasikan deretan nama precomp unik yang belum dipakai di project
+function _getUniquePcNames(count, customPrefix, isSingle) {
+    var prefix = "";
+    if (customPrefix !== undefined && customPrefix !== null) {
+        prefix = String(customPrefix).replace(/^\s+/, "").replace(/\s+$/, "");
+    }
+
+    var baseName;
+    if (prefix.length > 0) {
+        var lastChar = prefix.charAt(prefix.length - 1);
+        if (lastChar !== ' ' && lastChar !== '_' && lastChar !== '-') {
+            baseName = prefix + " ";
+        } else {
+            baseName = prefix;
         }
-        if (!taken) return candidate;
+    } else {
+        baseName = isSingle ? "" : "Pre-Comp ";
+    }
+
+    // Kumpulkan seluruh nama item yang ada di project agar lookup O(1)
+    var existingNames = {};
+    for (var p = 1; p <= app.project.numItems; p++) {
+        existingNames[app.project.item(p).name] = true;
+    }
+
+    var names = [];
+    var num = 1;
+    while (names.length < count) {
+        var candidate = baseName + num;
+        if (!existingNames[candidate]) {
+            existingNames[candidate] = true;
+            names.push(candidate);
+        }
         num++;
     }
+    return names;
+}
+
+// Cari nama precomp yang belum dipakai di project (backward compatibility)
+function _uniquePcName(layerCount, customPrefix) {
+    var names = _getUniquePcNames(1, customPrefix, layerCount === 1);
+    return names[0];
 }
 
 // Fix timing dan posisi stack setelah precompose
@@ -661,7 +707,86 @@ function kaycee_setCompFps(fps) {
 
 // ── Audio Separation Helpers ─────────────────────────────────
 
-// Get currently selected layer's audio file info
+// Cari file media (audio atau image) di dalam Pre-Comp (termasuk precomp bersarang)
+function _findMediaInComp(innerComp, mediaType, currentOffset) {
+    if (!innerComp || !(innerComp instanceof CompItem)) return null;
+    if (currentOffset === undefined || currentOffset === null) currentOffset = 0;
+
+    for (var i = 1; i <= innerComp.numLayers; i++) {
+        var l = innerComp.layer(i);
+        if (!l) continue;
+
+        // Cek jika layer ini memiliki source FootageItem dengan file di disk
+        if (l.source && (l.source instanceof FootageItem) && l.source.file && l.source.file.exists) {
+            var fPath = l.source.file.fsName;
+            var fLower = fPath.toLowerCase();
+
+            if (mediaType === "audio") {
+                var hasAud = false;
+                try { hasAud = l.hasAudio; } catch(ex) {}
+                var isAudioExt = (
+                    fLower.indexOf('.mp3') !== -1 || fLower.indexOf('.wav') !== -1 ||
+                    fLower.indexOf('.aac') !== -1 || fLower.indexOf('.m4a') !== -1 ||
+                    fLower.indexOf('.flac') !== -1 || fLower.indexOf('.aif') !== -1 ||
+                    fLower.indexOf('.aiff') !== -1 || fLower.indexOf('.mp4') !== -1 ||
+                    fLower.indexOf('.mov') !== -1 || fLower.indexOf('.avi') !== -1 ||
+                    fLower.indexOf('.mkv') !== -1 || fLower.indexOf('.wmv') !== -1
+                );
+                if (hasAud || isAudioExt) {
+                    return {
+                        layer: l,
+                        file: l.source.file,
+                        filePath: fPath,
+                        offset: currentOffset + l.startTime,
+                        width: l.source.width,
+                        height: l.source.height
+                    };
+                }
+            } else if (mediaType === "image") {
+                var isImageExt = (
+                    fLower.indexOf('.png') !== -1 || fLower.indexOf('.jpg') !== -1 ||
+                    fLower.indexOf('.jpeg') !== -1 || fLower.indexOf('.webp') !== -1 ||
+                    fLower.indexOf('.psd') !== -1 || fLower.indexOf('.tif') !== -1 ||
+                    fLower.indexOf('.tiff') !== -1 || fLower.indexOf('.bmp') !== -1
+                );
+                if (isImageExt) {
+                    return {
+                        layer: l,
+                        file: l.source.file,
+                        filePath: fPath,
+                        offset: currentOffset + l.startTime,
+                        width: l.source.width,
+                        height: l.source.height
+                    };
+                }
+            }
+        } else if (l.source && (l.source instanceof CompItem)) {
+            // Pre-comp bersarang (nested), telusuri ke dalam
+            var nested = _findMediaInComp(l.source, mediaType, currentOffset + l.startTime);
+            if (nested) return nested;
+        }
+    }
+    return null;
+}
+
+// Render/export frame saat ini dari comp/layer ke file PNG sementara
+function _exportCompCurrentFrame(comp, lyr) {
+    try {
+        var tempFolder = Folder.temp;
+        var tempFile = new File(tempFolder.fsName + "/kaycee_frame_" + (new Date().getTime()) + ".png");
+        if (lyr && lyr.source && (lyr.source instanceof CompItem) && typeof lyr.source.saveFrameToPng === "function") {
+            var innerTime = comp.time - lyr.startTime;
+            lyr.source.saveFrameToPng(innerTime, tempFile);
+            if (tempFile.exists) return tempFile;
+        } else if (comp && typeof comp.saveFrameToPng === "function") {
+            comp.saveFrameToPng(comp.time, tempFile);
+            if (tempFile.exists) return tempFile;
+        }
+    } catch(e) {}
+    return null;
+}
+
+// Get currently selected layer's audio file info (supports normal layers & pre-comps)
 function kaycee_getSelectedAudioLayer() {
     try {
         var comp = kaycee_getComp();
@@ -673,11 +798,24 @@ function kaycee_getSelectedAudioLayer() {
         }
 
         var lyr = layers[0];
-        if (!lyr.source || !lyr.source.file) {
+        var file = null;
+        var innerOffset = 0;
+
+        if (lyr.source && lyr.source.file) {
+            file = lyr.source.file;
+        } else if (lyr.source && (lyr.source instanceof CompItem)) {
+            // Layer adalah Pre-Comp: cari media audio/video di dalamnya
+            var found = _findMediaInComp(lyr.source, "audio", 0);
+            if (found) {
+                file = found.file;
+                innerOffset = found.offset;
+            } else {
+                return _err("Layer Pre-Comp '" + lyr.name + "' tidak berisi file audio/video di dalamnya.");
+            }
+        } else {
             return _err("Layer '" + lyr.name + "' is not a media file on disk (must be audio/video).");
         }
 
-        var file = lyr.source.file;
         var info = {
             ok: true,
             name: lyr.name,
@@ -686,7 +824,9 @@ function kaycee_getSelectedAudioLayer() {
             inPoint: lyr.inPoint,
             outPoint: lyr.outPoint,
             startTime: lyr.startTime,
-            index: lyr.index
+            innerOffset: innerOffset,
+            index: lyr.index,
+            isPreComp: (lyr.source instanceof CompItem)
         };
 
         return JSON.stringify(info);
@@ -696,7 +836,7 @@ function kaycee_getSelectedAudioLayer() {
 }
 
 // Import isolated stem files back into AE and align in timeline
-function kaycee_importAndAddStems(vocalsPath, instPath, targetLayerIndex, muteOriginal, qualityLabel) {
+function kaycee_importAndAddStems(vocalsPath, instPath, targetLayerIndex, muteOriginal, qualityLabel, innerOffset) {
     try {
         var comp = kaycee_getComp();
         if (!comp) return _err("No active composition in After Effects.");
@@ -708,9 +848,10 @@ function kaycee_importAndAddStems(vocalsPath, instPath, targetLayerIndex, muteOr
             targetLayer = comp.layer(targetLayerIndex);
         }
 
+        var offset = (typeof innerOffset === "number") ? innerOffset : 0;
         var inPoint = targetLayer ? targetLayer.inPoint : 0;
         var outPoint = targetLayer ? targetLayer.outPoint : comp.duration;
-        var startTime = targetLayer ? targetLayer.startTime : 0;
+        var startTime = targetLayer ? (targetLayer.startTime + offset) : 0;
 
         var qLabel = (qualityLabel && qualityLabel !== "") ? qualityLabel : "Fast Quality";
         var importedCount = 0;
@@ -783,7 +924,7 @@ function kaycee_importAndAddStems(vocalsPath, instPath, targetLayerIndex, muteOr
 
 // ── AI Image Background Removal (Cutout) ──────────────────────
 
-// Detect currently selected image layer in After Effects
+// Detect currently selected image layer in After Effects (supports normal layers & pre-comps)
 function kaycee_getSelectedImageLayer() {
     try {
         var comp = kaycee_getComp();
@@ -795,30 +936,52 @@ function kaycee_getSelectedImageLayer() {
         }
 
         var lyr = layers[0];
-        if (!lyr.source || !(lyr.source instanceof FootageItem)) {
+        var filePath = null;
+        var width = 0;
+        var height = 0;
+
+        if (lyr.source && (lyr.source instanceof FootageItem) && lyr.source.file && lyr.source.file.exists) {
+            var fPath = lyr.source.file.fsName;
+            var fLower = fPath.toLowerCase();
+            var isImage = (
+                fLower.indexOf('.png') !== -1 ||
+                fLower.indexOf('.jpg') !== -1 ||
+                fLower.indexOf('.jpeg') !== -1 ||
+                fLower.indexOf('.webp') !== -1 ||
+                fLower.indexOf('.psd') !== -1 ||
+                fLower.indexOf('.tif') !== -1 ||
+                fLower.indexOf('.tiff') !== -1 ||
+                fLower.indexOf('.bmp') !== -1
+            );
+
+            if (!isImage) {
+                return _err("Selected layer '" + lyr.name + "' is not a supported image file (PNG, JPG, PSD, WebP, etc.).");
+            }
+            filePath = fPath;
+            width = lyr.source.width;
+            height = lyr.source.height;
+
+        } else if (lyr.source && (lyr.source instanceof CompItem)) {
+            // Pre-Comp layer:
+            // 1. Cek apakah ada layer gambar di dalam precomp
+            var found = _findMediaInComp(lyr.source, "image", 0);
+            if (found) {
+                filePath = found.filePath;
+                width = found.width;
+                height = found.height;
+            } else {
+                // 2. Render frame saat ini dari comp jika didukung
+                var exportedFile = _exportCompCurrentFrame(comp, lyr);
+                if (exportedFile) {
+                    filePath = exportedFile.fsName;
+                    width = comp.width;
+                    height = comp.height;
+                } else {
+                    return _err("Layer Pre-Comp '" + lyr.name + "' tidak berisi file gambar (PNG, JPG, PSD, dll.) di dalamnya.");
+                }
+            }
+        } else {
             return _err("Selected layer '" + lyr.name + "' is not an image footage layer (PNG, JPG, PSD, WebP, etc.).");
-        }
-
-        var file = lyr.source.file;
-        if (!file || !file.exists) {
-            return _err("Footage file not found on disk for layer: " + lyr.name);
-        }
-
-        var filePath = file.fsName;
-        var fLower = filePath.toLowerCase();
-        var isImage = (
-            fLower.indexOf('.png') !== -1 ||
-            fLower.indexOf('.jpg') !== -1 ||
-            fLower.indexOf('.jpeg') !== -1 ||
-            fLower.indexOf('.webp') !== -1 ||
-            fLower.indexOf('.psd') !== -1 ||
-            fLower.indexOf('.tif') !== -1 ||
-            fLower.indexOf('.tiff') !== -1 ||
-            fLower.indexOf('.bmp') !== -1
-        );
-
-        if (!isImage) {
-            return _err("Selected layer '" + lyr.name + "' is not a supported image file (PNG, JPG, PSD, WebP, etc.).");
         }
 
         return JSON.stringify({
@@ -826,8 +989,9 @@ function kaycee_getSelectedImageLayer() {
             name: lyr.name,
             index: lyr.index,
             filePath: filePath,
-            width: lyr.source.width,
-            height: lyr.source.height
+            width: width,
+            height: height,
+            isPreComp: (lyr.source instanceof CompItem)
         });
     } catch (e) {
         return _err("Error detecting image layer: " + e.toString());

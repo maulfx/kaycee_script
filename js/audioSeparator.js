@@ -638,13 +638,15 @@
 
     var isQuality = (selectedModel === 'quality' || selectedModel === 'roformer');
     var qualityLabel = isQuality ? 'Studio Quality' : 'Fast Quality';
+    var innerOffset = (layerRes && typeof layerRes.innerOffset === 'number') ? layerRes.innerOffset : 0;
 
     var jsxCall = 'kaycee_importAndAddStems(' +
       JSON.stringify(vPath) + ', ' +
       JSON.stringify(iPath) + ', ' +
       layerIndex + ', ' +
       (muteOriginal ? 'true' : 'false') + ', ' +
-      JSON.stringify(qualityLabel) + ')';
+      JSON.stringify(qualityLabel) + ', ' +
+      innerOffset + ')';
 
     reloadMainJSX(function () {
       window.runJSX(jsxCall, function (rawRes) {

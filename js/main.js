@@ -56,9 +56,141 @@ function onBtn(id, handler) {
 
 // ── COMPOSITION buttons ──────────────────────────────────────
 
+// ── Pre-Comp Prefix & Custom Name Modal ──────────────────────
+var STORAGE_KEY_PRECOMP_PREFIX = 'kaycee_precomp_prefix';
+var precompPendingShift = false;
+
+function getSavedPrecompPrefix() {
+  try {
+    return localStorage.getItem(STORAGE_KEY_PRECOMP_PREFIX) || '';
+  } catch (e) {
+    return '';
+  }
+}
+
+function updatePrecompButtonTooltip() {
+  var precompBtn = document.getElementById('btn-precomp');
+  if (!precompBtn) return;
+  var prefix = getSavedPrecompPrefix().trim();
+  if (prefix.length > 0) {
+    var lastChar = prefix.charAt(prefix.length - 1);
+    var sep = (lastChar === '_' || lastChar === '-') ? '' : ' ';
+    precompBtn.title = 'Pre-Comp (\'' + prefix + sep + '1\', \'' + prefix + sep + '2\'...) | Shift: into one | Ctrl: custom name';
+  } else {
+    precompBtn.title = 'Pre-Comp (1, 2, 3...) | Shift: into one | Ctrl: custom name';
+  }
+}
+
+function openPrecompModal(shift) {
+  precompPendingShift = !!shift;
+  var modal = document.getElementById('precomp-modal');
+  var input = document.getElementById('modal-precomp-input');
+  if (!modal || !input) return;
+
+  input.value = getSavedPrecompPrefix();
+  modal.classList.add('open');
+  setTimeout(function () {
+    input.focus();
+    input.select();
+  }, 40);
+}
+
+function closePrecompModal() {
+  var modal = document.getElementById('precomp-modal');
+  if (modal) modal.classList.remove('open');
+}
+
+function savePrecompPrefix(val) {
+  var clean = (val || '').trim();
+  try {
+    if (clean.length > 0) {
+      localStorage.setItem(STORAGE_KEY_PRECOMP_PREFIX, clean);
+    } else {
+      localStorage.removeItem(STORAGE_KEY_PRECOMP_PREFIX);
+    }
+  } catch (e) {}
+  updatePrecompButtonTooltip();
+  return clean;
+}
+
+function initPrecompModal() {
+  updatePrecompButtonTooltip();
+
+  var modal = document.getElementById('precomp-modal');
+  var input = document.getElementById('modal-precomp-input');
+  var btnClose = document.getElementById('btn-precomp-modal-close');
+  var btnReset = document.getElementById('btn-precomp-modal-reset');
+  var btnApply = document.getElementById('btn-precomp-modal-apply');
+
+  if (btnClose) {
+    btnClose.addEventListener('click', closePrecompModal);
+  }
+
+  if (modal) {
+    modal.addEventListener('click', function (e) {
+      if (e.target === modal) {
+        closePrecompModal();
+      }
+    });
+  }
+
+  if (btnReset) {
+    btnReset.addEventListener('click', function () {
+      savePrecompPrefix('');
+      if (input) input.value = '';
+      closePrecompModal();
+    });
+  }
+
+  if (btnApply) {
+    btnApply.addEventListener('click', function () {
+      var val = input ? input.value : '';
+      var prefix = savePrecompPrefix(val);
+      closePrecompModal();
+      var shiftStr = precompPendingShift ? 'true' : 'false';
+      runJSX('kaycee_preComp(' + shiftStr + ', ' + JSON.stringify(prefix) + ')', parseResult);
+    });
+  }
+
+  if (input) {
+    input.addEventListener('keydown', function (e) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        if (btnApply) btnApply.click();
+      } else if (e.key === 'Escape') {
+        closePrecompModal();
+      }
+    });
+  }
+
+  window.addEventListener('keydown', function (e) {
+    if (e.key === 'Escape' && modal && modal.classList.contains('open')) {
+      closePrecompModal();
+    }
+  });
+
+  // Handle right-click on Pre-Comp button to open modal as well
+  var precompBtn = document.getElementById('btn-precomp');
+  if (precompBtn) {
+    precompBtn.addEventListener('contextmenu', function (e) {
+      e.preventDefault();
+      openPrecompModal(e.shiftKey);
+    });
+  }
+}
+
 onBtn('btn-precomp', function (e) {
+  // If Ctrl (or Cmd) is held, open the custom name popup modal
+  if (e.ctrlKey || e.metaKey) {
+    e.preventDefault();
+    openPrecompModal(e.shiftKey);
+    return;
+  }
+
+  // Normal click (or Shift click): run Pre-Comp using the saved custom prefix
   var shift = e.shiftKey ? 'true' : 'false';
-  runJSX('kaycee_preComp(' + shift + ')', parseResult);
+  var prefix = getSavedPrecompPrefix();
+  runJSX('kaycee_preComp(' + shift + ', ' + JSON.stringify(prefix) + ')', parseResult);
 });
 
 onBtn('btn-mt', function (e) {
@@ -1219,6 +1351,7 @@ function autoCleanOldCache() {
 
 // ── Init ─────────────────────────────────────────────────────
 loadSettings();
+initPrecompModal();
 initNavTabs();
 autoCleanOldCache();
 
