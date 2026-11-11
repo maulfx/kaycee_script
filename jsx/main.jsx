@@ -648,24 +648,128 @@ function kaycee_getCompSize() {
     }
 }
 
-// ── Set Composition Size ──────────────────────────────────────
-function kaycee_setCompSize(width, height) {
+// ── Get native size of selected layers ───────────────────────
+// Returns the source dimensions of all selected layers (unique sizes),
+// dan FPS (frameRate) untuk komponen yang bisa dibaca.
+// Jika ada banyak layer, kembalikan ukuran unik pertama yang ditemukan dari sumber aslinya.
+function kaycee_getSelectedLayerNativeSize() {
     try {
         var comp = kaycee_getComp();
         if (!comp) return _err("No active composition.");
 
+        var layers = comp.selectedLayers;
+        if (!layers || layers.length === 0) return _err("No layers selected.");
+
+        var results = [];
+        for (var i = 0; i < layers.length; i++) {
+            var lyr = layers[i];
+            var src = lyr.source;
+            if (!src) continue;
+
+            var w = 0, h = 0;
+            if (src instanceof CompItem) {
+                w = src.width;
+                h = src.height;
+            } else if (src instanceof FootageItem) {
+                w = src.width;
+                h = src.height;
+            }
+            if (w > 0 && h > 0) {
+                // Tambah hanya jika ukuran ini belum ada dalam results
+                var found = false;
+                for (var j = 0; j < results.length; j++) {
+                    if (results[j].width === w && results[j].height === h) { found = true; break; }
+                }
+                if (!found) results.push({ width: w, height: h, name: lyr.name });
+            }
+        }
+
+        if (results.length === 0) return _err("Selected layers have no readable source dimensions.");
+
+        return JSON.stringify({ ok: true, sizes: results });
+    } catch (e) {
+        return _err("Get native size failed: " + e.toString());
+    }
+}
+
+// ── Get native FPS of selected layers ────────────────────────
+// Returns unique frame rates from selected layers' sources.
+function kaycee_getSelectedLayerNativeFps() {
+    try {
+        var comp = kaycee_getComp();
+        if (!comp) return _err("No active composition.");
+
+        var layers = comp.selectedLayers;
+        if (!layers || layers.length === 0) return _err("No layers selected.");
+
+        var results = [];
+        for (var i = 0; i < layers.length; i++) {
+            var lyr = layers[i];
+            var src = lyr.source;
+            if (!src) continue;
+
+            var fps = 0;
+            if (src instanceof CompItem) {
+                fps = src.frameRate;
+            } else if (src instanceof FootageItem) {
+                try { fps = src.frameRate; } catch(ex) {}
+            }
+            if (fps > 0) {
+                // Bulatkan ke desimal 3 tempat untuk menghindari floating-point noise
+                fps = Math.round(fps * 1000) / 1000;
+                var found = false;
+                for (var j = 0; j < results.length; j++) {
+                    if (results[j].fps === fps) { found = true; break; }
+                }
+                if (!found) results.push({ fps: fps, name: lyr.name });
+            }
+        }
+
+        if (results.length === 0) return _err("Selected layers have no readable frame rate.");
+
+        return JSON.stringify({ ok: true, rates: results });
+    } catch (e) {
+        return _err("Get native FPS failed: " + e.toString());
+    }
+}
+
+// ── Set Composition Size ──────────────────────────────────────
+// Jika ada precomp layer terpilih → ubah SEMUA comp precomp yang dipilih.
+// Jika tidak ada precomp layer → ubah active comp.
+function kaycee_setCompSize(width, height) {
+    try {
         width = parseInt(width, 10);
         height = parseInt(height, 10);
         if (isNaN(width) || width <= 0 || isNaN(height) || height <= 0) {
             return _err("Invalid dimensions: " + width + "x" + height);
         }
 
+        var activeComp = kaycee_getComp();
+        if (!activeComp) return _err("No active composition.");
+
+        // Kumpulkan semua comp unik dari precomp layer yang dipilih
+        var targetComps = [];
+        var seen = {};
+        var selLayers = activeComp.selectedLayers;
+        for (var i = 0; i < selLayers.length; i++) {
+            var src = selLayers[i].source;
+            if (src && (src instanceof CompItem) && !seen[src.id]) {
+                seen[src.id] = true;
+                targetComps.push(src);
+            }
+        }
+
+        // Fallback ke active comp jika tidak ada precomp layer dipilih
+        if (targetComps.length === 0) targetComps.push(activeComp);
+
         app.beginUndoGroup("Resize Comp to " + width + "x" + height);
-        comp.width = width;
-        comp.height = height;
+        for (var j = 0; j < targetComps.length; j++) {
+            targetComps[j].width = width;
+            targetComps[j].height = height;
+        }
         app.endUndoGroup();
 
-        return JSON.stringify({ ok: true, width: comp.width, height: comp.height });
+        return JSON.stringify({ ok: true, width: width, height: height, count: targetComps.length });
     } catch (e) {
         try { app.endUndoGroup(); } catch(ex) {}
         return _err("Resize Comp failed: " + e.toString());
@@ -684,21 +788,40 @@ function kaycee_getCompFps() {
 }
 
 // ── Set Composition FPS ───────────────────────────────────────
+// Jika ada precomp layer terpilih → ubah FPS SEMUA comp precomp yang dipilih.
+// Jika tidak ada precomp layer → ubah active comp.
 function kaycee_setCompFps(fps) {
     try {
-        var comp = kaycee_getComp();
-        if (!comp) return _err("No active composition.");
-
         fps = parseFloat(fps);
         if (isNaN(fps) || fps <= 0) {
             return _err("Invalid FPS: " + fps);
         }
 
+        var activeComp = kaycee_getComp();
+        if (!activeComp) return _err("No active composition.");
+
+        // Kumpulkan semua comp unik dari precomp layer yang dipilih
+        var targetComps = [];
+        var seen = {};
+        var selLayers = activeComp.selectedLayers;
+        for (var i = 0; i < selLayers.length; i++) {
+            var src = selLayers[i].source;
+            if (src && (src instanceof CompItem) && !seen[src.id]) {
+                seen[src.id] = true;
+                targetComps.push(src);
+            }
+        }
+
+        // Fallback ke active comp jika tidak ada precomp layer dipilih
+        if (targetComps.length === 0) targetComps.push(activeComp);
+
         app.beginUndoGroup("Change Comp FPS to " + fps);
-        comp.frameRate = fps;
+        for (var j = 0; j < targetComps.length; j++) {
+            targetComps[j].frameRate = fps;
+        }
         app.endUndoGroup();
 
-        return JSON.stringify({ ok: true, frameRate: comp.frameRate });
+        return JSON.stringify({ ok: true, frameRate: fps, count: targetComps.length });
     } catch (e) {
         try { app.endUndoGroup(); } catch(ex) {}
         return _err("Change Comp FPS failed: " + e.toString());
@@ -724,15 +847,25 @@ function _findMediaInComp(innerComp, mediaType, currentOffset) {
             if (mediaType === "audio") {
                 var hasAud = false;
                 try { hasAud = l.hasAudio; } catch(ex) {}
-                var isAudioExt = (
+                var isAudioOnlyExt = (
                     fLower.indexOf('.mp3') !== -1 || fLower.indexOf('.wav') !== -1 ||
                     fLower.indexOf('.aac') !== -1 || fLower.indexOf('.m4a') !== -1 ||
                     fLower.indexOf('.flac') !== -1 || fLower.indexOf('.aif') !== -1 ||
-                    fLower.indexOf('.aiff') !== -1 || fLower.indexOf('.mp4') !== -1 ||
-                    fLower.indexOf('.mov') !== -1 || fLower.indexOf('.avi') !== -1 ||
-                    fLower.indexOf('.mkv') !== -1 || fLower.indexOf('.wmv') !== -1
+                    fLower.indexOf('.aiff') !== -1
                 );
-                if (hasAud || isAudioExt) {
+                var isVideoExt = (
+                    fLower.indexOf('.mp4') !== -1 || fLower.indexOf('.mov') !== -1 ||
+                    fLower.indexOf('.avi') !== -1 || fLower.indexOf('.mkv') !== -1 ||
+                    fLower.indexOf('.wmv') !== -1
+                );
+                // Valid jika file audio murni, atau file video yang memiliki track audio aktif
+                var isAudioValid = isAudioOnlyExt || (hasAud && isVideoExt) || hasAud;
+                var isAudActive = true;
+                try {
+                    if (l.audioEnabled === false) isAudActive = false;
+                } catch(ex) {}
+
+                if (isAudioValid && isAudActive) {
                     return {
                         layer: l,
                         file: l.source.file,
@@ -799,16 +932,29 @@ function kaycee_getSelectedAudioLayer() {
 
         var lyr = layers[0];
         var file = null;
-        var innerOffset = 0;
+        var trimStart = 0;    // detik awal di file asli yang perlu dipotong
+        var trimDuration = -1; // durasi (detik) yang dipakai; -1 = tidak perlu trim
 
         if (lyr.source && lyr.source.file) {
+            // Layer biasa (footage langsung)
             file = lyr.source.file;
+            // Hitung trim berdasarkan inPoint/outPoint layer di comp
+            // inPoint = waktu di comp; startTime = waktu layer mulai relatif ke file
+            // trimStart di file asli = inPoint - startTime (waktu yang dipakai di file)
+            trimStart = lyr.inPoint - lyr.startTime;
+            if (trimStart < 0) trimStart = 0;
+            trimDuration = lyr.outPoint - lyr.inPoint;
         } else if (lyr.source && (lyr.source instanceof CompItem)) {
-            // Layer adalah Pre-Comp: cari media audio/video di dalamnya
+            // Layer adalah Pre-Comp: cari file audio di dalamnya
             var found = _findMediaInComp(lyr.source, "audio", 0);
             if (found) {
                 file = found.file;
-                innerOffset = found.offset;
+                // trimStart di file asli = (inPoint precomp - startTime precomp) - found.offset
+                // found.offset = total startTime layer di dalam precomp (relatif ke precomp time 0)
+                var precompInnerStart = lyr.inPoint - lyr.startTime; // waktu di dalam precomp saat precomp layer dimulai
+                trimStart = precompInnerStart - found.offset;
+                if (trimStart < 0) trimStart = 0;
+                trimDuration = lyr.outPoint - lyr.inPoint; // durasi yang terlihat = sesuai precomp layer di parent
             } else {
                 return _err("Layer Pre-Comp '" + lyr.name + "' tidak berisi file audio/video di dalamnya.");
             }
@@ -824,8 +970,11 @@ function kaycee_getSelectedAudioLayer() {
             inPoint: lyr.inPoint,
             outPoint: lyr.outPoint,
             startTime: lyr.startTime,
-            innerOffset: innerOffset,
+            trimStart: trimStart,
+            trimDuration: trimDuration,
+            innerOffset: 0,
             index: lyr.index,
+            compId: comp.id,
             isPreComp: (lyr.source instanceof CompItem)
         };
 
@@ -836,22 +985,45 @@ function kaycee_getSelectedAudioLayer() {
 }
 
 // Import isolated stem files back into AE and align in timeline
-function kaycee_importAndAddStems(vocalsPath, instPath, targetLayerIndex, muteOriginal, qualityLabel, innerOffset) {
+// Stem diletakkan tepat di posisi layer asli (inPoint/outPoint) di parent comp
+function kaycee_importAndAddStems(vocalsPath, instPath, targetLayerIndex, muteOriginal, qualityLabel, targetLayerName, compId) {
     try {
-        var comp = kaycee_getComp();
+        var comp = null;
+        if (compId) {
+            for (var c = 1; c <= app.project.numItems; c++) {
+                var it = app.project.item(c);
+                if ((it instanceof CompItem) && it.id === compId) {
+                    comp = it;
+                    break;
+                }
+            }
+        }
+        if (!comp) comp = kaycee_getComp();
         if (!comp) return _err("No active composition in After Effects.");
 
         app.beginUndoGroup("Kaycee Audio Separation Import");
 
         var targetLayer = null;
         if (targetLayerIndex && targetLayerIndex <= comp.numLayers) {
-            targetLayer = comp.layer(targetLayerIndex);
+            var candidate = comp.layer(targetLayerIndex);
+            if (!targetLayerName || candidate.name === targetLayerName) {
+                targetLayer = candidate;
+            }
+        }
+        if (!targetLayer && targetLayerName) {
+            for (var l = 1; l <= comp.numLayers; l++) {
+                if (comp.layer(l).name === targetLayerName) {
+                    targetLayer = comp.layer(l);
+                    break;
+                }
+            }
         }
 
-        var offset = (typeof innerOffset === "number") ? innerOffset : 0;
-        var inPoint = targetLayer ? targetLayer.inPoint : 0;
+        // Posisi stem = persis sama dengan posisi layer asli/precomp di comp
+        var inPoint  = targetLayer ? targetLayer.inPoint  : 0;
         var outPoint = targetLayer ? targetLayer.outPoint : comp.duration;
-        var startTime = targetLayer ? (targetLayer.startTime + offset) : 0;
+        // startTime stem = inPoint di comp (stem dimulai tepat di awal layer)
+        var startTime = inPoint;
 
         var qLabel = (qualityLabel && qualityLabel !== "") ? qualityLabel : "Fast Quality";
         var importedCount = 0;

@@ -414,6 +414,52 @@
   }
 
   /**
+   * Trim audio file menggunakan ffmpeg secara akurat (sample-accurate).
+   * Selalu decode audio ke format PCM WAV 16-bit agar pas dengan durasi & start timeline,
+   * tanpa jitter keyframe dari '-c copy'.
+   */
+  function trimAudioIfNeeded(sourceFile, layerRes, outDir, callback) {
+    var trimStart    = (layerRes && typeof layerRes.trimStart    === 'number') ? layerRes.trimStart    : 0;
+    var trimDuration = (layerRes && typeof layerRes.trimDuration === 'number') ? layerRes.trimDuration : -1;
+
+    // Tidak perlu trim jika trimStart <= 0.001 dan trimDuration tidak dibatasi (seluruh file)
+    var needTrim = (trimStart > 0.001) || (trimDuration > 0.001);
+    if (!needTrim) {
+      callback(sourceFile);
+      return;
+    }
+
+    // Output selalu uncompressed PCM WAV agar sample-accurate dan AI separator cepat memproses
+    var trimmedFile = path.join(outDir, 'kaycee_trimmed_' + Date.now() + '.wav');
+
+    var args = ['-y', '-ss', trimStart.toFixed(4), '-i', sourceFile];
+    if (trimDuration > 0.001) {
+      args.push('-t', trimDuration.toFixed(4));
+    }
+    args.push('-vn', '-acodec', 'pcm_s16le', trimmedFile);
+
+    var ffProc = child_process.spawn('ffmpeg', args, {
+      windowsHide: true,
+      env: getCustomEnv()
+    });
+
+    ffProc.on('close', function (code) {
+      if (code === 0 && fs.existsSync(trimmedFile)) {
+        callback(trimmedFile);
+      } else {
+        // Gagal trim → pakai file asli (fallback)
+        console.warn('[Kaycee Audio] ffmpeg trim failed (code ' + code + '), using original file');
+        callback(sourceFile);
+      }
+    });
+
+    ffProc.on('error', function (err) {
+      console.warn('[Kaycee Audio] ffmpeg error:', err);
+      callback(sourceFile);
+    });
+  }
+
+  /**
    * Run the separation process via local Python / audio-separator
    */
   function startAudioSeparation() {
@@ -470,82 +516,85 @@
           console.error('[Kaycee Audio] Error creating outDir:', e);
         }
 
-        updateProgress(20, 'Separating (' + qualityLabel + ')...');
+        // Trim audio dulu jika layer adalah precomp atau ada inPoint/outPoint (hanya ambil bagian yang dipakai)
+        trimAudioIfNeeded(sourceFile, layerRes, outDir, function (fileToProcess) {
+          updateProgress(20, 'Separating (' + qualityLabel + ')...');
 
-        var sepScript = getSeparateScriptPath();
-        var pyExe = getPythonExecutable();
+          var sepScript = getSeparateScriptPath();
+          var pyExe = getPythonExecutable();
 
-        var cmdArgs = [
-          sepScript,
-          '-m', modelArg,
-          '--output_dir', outDir,
-          '--output_format', 'WAV',
-          sourceFile
-        ];
+          var cmdArgs = [
+            sepScript,
+            '-m', modelArg,
+            '--output_dir', outDir,
+            '--output_format', 'WAV',
+            fileToProcess
+          ];
 
-        var proc = child_process.spawn(pyExe, cmdArgs, {
-          windowsHide: true,
-          env: getCustomEnv()
-        });
+          var proc = child_process.spawn(pyExe, cmdArgs, {
+            windowsHide: true,
+            env: getCustomEnv()
+          });
 
         var logAccumulator = '';
-        var phase1Done = false;
+          var phase1Done = false;
 
-        proc.stdout.on('data', function (data) {
-          var str = data.toString();
-          logAccumulator += str;
-          console.log('[audio-separator]', str);
+          proc.stdout.on('data', function (data) {
+            var str = data.toString();
+            logAccumulator += str;
+            console.log('[audio-separator]', str);
 
-          if (str.indexOf('%') !== -1) {
-            var match = str.match(/(\d+)%/);
-            if (match) {
-              var p = parseInt(match[1], 10);
-              if (!phase1Done) {
-                // Phase 1 (inference): 20% -> 70%
-                updateProgress(20 + (p * 0.5), 'Separating (' + qualityLabel + ') ' + p + '%');
-                if (p >= 98) phase1Done = true;
-              } else {
-                // Phase 2 (post-processing/writing): 70% -> 90%
-                updateProgress(70 + (p * 0.2), 'Generating stems ' + p + '%');
+            if (str.indexOf('%') !== -1) {
+              var match = str.match(/(\d+)%/);
+              if (match) {
+                var p = parseInt(match[1], 10);
+                if (!phase1Done) {
+                  // Phase 1 (inference): 20% -> 70%
+                  updateProgress(20 + (p * 0.5), 'Separating (' + qualityLabel + ') ' + p + '%');
+                  if (p >= 98) phase1Done = true;
+                } else {
+                  // Phase 2 (post-processing/writing): 70% -> 90%
+                  updateProgress(70 + (p * 0.2), 'Generating stems ' + p + '%');
+                }
               }
+            } else if (str.indexOf('Saving') !== -1 || str.indexOf('Writing') !== -1) {
+              updateProgress(90, 'Writing audio stems...');
             }
-          } else if (str.indexOf('Saving') !== -1 || str.indexOf('Writing') !== -1) {
-            updateProgress(90, 'Writing audio stems...');
-          }
-        });
+          });
 
-        proc.stderr.on('data', function (data) {
-          var str = data.toString();
-          logAccumulator += str;
-          console.warn('[audio-separator stderr]', str);
-          if (str.indexOf('%') !== -1) {
-            var match = str.match(/(\d+)%/);
-            if (match) {
-              var p = parseInt(match[1], 10);
-              if (!phase1Done) {
-                updateProgress(20 + (p * 0.5), 'Separating (' + qualityLabel + ') ' + p + '%');
-                if (p >= 98) phase1Done = true;
-              } else {
-                updateProgress(70 + (p * 0.2), 'Generating stems ' + p + '%');
+          proc.stderr.on('data', function (data) {
+            var str = data.toString();
+            logAccumulator += str;
+            console.warn('[audio-separator stderr]', str);
+            if (str.indexOf('%') !== -1) {
+              var match = str.match(/(\d+)%/);
+              if (match) {
+                var p = parseInt(match[1], 10);
+                if (!phase1Done) {
+                  updateProgress(20 + (p * 0.5), 'Separating (' + qualityLabel + ') ' + p + '%');
+                  if (p >= 98) phase1Done = true;
+                } else {
+                  updateProgress(70 + (p * 0.2), 'Generating stems ' + p + '%');
+                }
               }
+            } else if (str.indexOf('Saving') !== -1 || str.indexOf('Writing') !== -1) {
+              updateProgress(90, 'Writing audio stems...');
             }
-          } else if (str.indexOf('Saving') !== -1 || str.indexOf('Writing') !== -1) {
-            updateProgress(90, 'Writing audio stems...');
-          }
-        });
+          });
 
-        proc.on('error', function (err) {
-          console.error('[audio-separator spawn error]', err);
-          handleSeparationFailure('Process error: ' + err.message);
-        });
+          proc.on('error', function (err) {
+            console.error('[audio-separator spawn error]', err);
+            handleSeparationFailure('Process error: ' + err.message);
+          });
 
-        proc.on('close', function (code) {
-          if (code === 0) {
-            handleSeparationSuccess(outDir, sourceFile, layerRes);
-          } else {
-            handleSeparationFailure('Separation failed (Exit code ' + code + '):\n' + logAccumulator);
-          }
-        });
+          proc.on('close', function (code) {
+            if (code === 0) {
+              handleSeparationSuccess(outDir, sourceFile, layerRes);
+            } else {
+              handleSeparationFailure('Separation failed (Exit code ' + code + '):\n' + logAccumulator);
+            }
+          });
+        }); // end trimAudioIfNeeded
       });
     }
 
@@ -635,10 +684,11 @@
     var vPath = importVocals ? vocalsFile.replace(/\\/g, '/') : '';
     var iPath = importInst ? instFile.replace(/\\/g, '/') : '';
     var layerIndex = layerRes.index || 1;
+    var layerName = layerRes.name || '';
+    var compId = layerRes.compId || 0;
 
     var isQuality = (selectedModel === 'quality' || selectedModel === 'roformer');
     var qualityLabel = isQuality ? 'Studio Quality' : 'Fast Quality';
-    var innerOffset = (layerRes && typeof layerRes.innerOffset === 'number') ? layerRes.innerOffset : 0;
 
     var jsxCall = 'kaycee_importAndAddStems(' +
       JSON.stringify(vPath) + ', ' +
@@ -646,7 +696,8 @@
       layerIndex + ', ' +
       (muteOriginal ? 'true' : 'false') + ', ' +
       JSON.stringify(qualityLabel) + ', ' +
-      innerOffset + ')';
+      JSON.stringify(layerName) + ', ' +
+      compId + ')';
 
     reloadMainJSX(function () {
       window.runJSX(jsxCall, function (rawRes) {

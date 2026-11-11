@@ -696,7 +696,7 @@ function renderCompPresetButtons() {
     b.appendChild(dimsSpan);
     b.appendChild(delBadge);
 
-    // Click: Resize active comp in AE!
+    // Click: ubah comp aktif atau comp dari precomp layer yang dipilih
     b.addEventListener('click', function () {
       b.classList.add('resizing');
       setTimeout(function () {
@@ -705,9 +705,7 @@ function renderCompPresetButtons() {
 
       runJSX('kaycee_setCompSize(' + p.width + ',' + p.height + ')', function (res) {
         var obj = parseResult(res);
-        if (obj && !obj.ok && obj.error) {
-          console.warn('[Kaycee]', obj.error);
-        }
+        if (obj && !obj.ok && obj.error) console.warn('[Kaycee]', obj.error);
       });
     });
 
@@ -921,7 +919,7 @@ function renderCompFpsButtons() {
     b.appendChild(unitSpan);
     b.appendChild(delBadge);
 
-    // Click: Set active comp FPS in AE!
+    // Click: ubah comp aktif atau comp dari precomp layer yang dipilih
     b.addEventListener('click', function () {
       b.classList.add('resizing');
       setTimeout(function () {
@@ -930,9 +928,7 @@ function renderCompFpsButtons() {
 
       runJSX('kaycee_setCompFps(' + p.fps + ')', function (res) {
         var obj = parseResult(res);
-        if (obj && !obj.ok && obj.error) {
-          console.warn('[Kaycee]', obj.error);
-        }
+        if (obj && !obj.ok && obj.error) console.warn('[Kaycee]', obj.error);
       });
     });
 
